@@ -1,0 +1,9 @@
+---
+layout: "layouts/base.webc"
+theme: "dark"
+
+title: "Feed Reader"
+description: "Ryan's RSS Feed Reader"
+---
+
+<script src="/js/refreshArticles.mjs" webc:keep type="module"></script>

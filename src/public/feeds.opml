@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.1">
+  <head>
+    <title>
+      Ryan's Feeds
+    </title>
+  </head>
+  <body>
+    <outline text="Adam Argyle" type="rss" xmlUrl="http://localhost:8080/mock-feeds/rss.xml"/>
+    <outline text="OddBird" type="rss" xmlUrl="http://localhost:8080/mock-feeds/feed.atom"/>
+  </body>
+</opml>

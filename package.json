@@ -1,0 +1,24 @@
+{
+  "type": "module",
+  "name": "reader",
+  "version": "1.0.0",
+  "description": "Custom RSS feed reader",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npx @11ty/eleventy --serve"
+  },
+  "author": "Ryan Geyer",
+  "license": "ISC",
+  "dependencies": {
+    "@11ty/eleventy": "^3.0.0",
+    "@11ty/eleventy-plugin-webc": "^0.11.2",
+    "@lit-labs/eleventy-plugin-lit": "^1.0.4",
+    "@lit-labs/signals": "^0.1.1"
+  },
+  "devDependencies": {
+    "csso": "^5.0.5",
+    "esbuild": "^0.24.2",
+    "html-minifier-terser": "^7.2.0",
+    "typescript": "^5.7.3"
+  }
+}
