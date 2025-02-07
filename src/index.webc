@@ -6,4 +6,5 @@ title: "Feed Reader"
 description: "Ryan's RSS Feed Reader"
 ---
 
+<articles-list></articles-list>
 <script src="/js/refreshArticles.mjs" webc:keep type="module"></script>

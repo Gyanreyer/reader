@@ -1,6 +1,7 @@
 import { db } from "./db.mjs";
 import { getMetadataForURL } from "./getOGImageForURL.mjs";
 import { refreshFeeds } from "./refreshFeeds.mjs";
+import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.mjs";
 
 const domParser = new DOMParser();
 
@@ -86,9 +87,9 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
   const parsedArticles = {};
 
   for (const item of items) {
-    if (!item.url) {
+    if (typeof item.url !== "string" || !URL.canParse(item.url)) {
       console.error(
-        `Received JSON feed with missing "url" property for item in feed URL ${feedURL}`
+        `Received JSON feed with invalid or missing "url" property for item in feed URL ${feedURL}`
       );
       continue;
     }
@@ -100,20 +101,22 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
     if (typeof item.title === "string") {
       title = item.title;
     } else if (item.content_text && typeof item.content_text === "string") {
-      title = `${item.content_text.slice(0, 50)}${
-        item.content_text.length > 50 ? "..." : ""
-      }`;
+      const extractedTitleSnippet = getTitleSnippetFromContentText(
+        item.content_text
+      );
+      if (extractedTitleSnippet) {
+        title = extractedTitleSnippet;
+      }
     } else if (item.content_html && typeof item.content_html === "string") {
       const parsedContentDocument = domParser.parseFromString(
         item.content_html,
         "text/html"
       );
-      const parsedContentText = parsedContentDocument.body.textContent.trim();
-      const parsedContentTextLength = parsedContentText.length;
-      if (parsedContentTextLength > 0) {
-        title = `${parsedContentText.slice(0, 50)}${
-          parsedContentTextLength > 50 ? "..." : ""
-        }`;
+      const extractedTitleSnippet = getTitleSnippetFromContentText(
+        parsedContentDocument.body.textContent
+      );
+      if (extractedTitleSnippet) {
+        title = extractedTitleSnippet;
       }
     }
 
@@ -138,7 +141,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
 
     parsedArticles[item.url] = {
       url: item.url,
-      title: item.title,
+      title: title,
       thumbnailURL,
       publishedAt: dateTimestamp
         ? new Date(dateTimestamp).getTime()
@@ -164,9 +167,9 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
 
   for (const item of items) {
     const articleURL = item.querySelector("link")?.textContent;
-    if (!articleURL) {
+    if (!articleURL || !URL.canParse(articleURL)) {
       console.error(
-        `Item in RSS feed ${feedURL} is missing a link`,
+        `Item in RSS feed ${feedURL} has missing or invalid link URL`,
         item.outerHTML
       );
     }
@@ -182,13 +185,11 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
           rawDescriptionText,
           "text/html"
         );
-        const parsedDescriptionText =
-          parsedDescriptionDocument.body.textContent.trim();
-        const parsedDescriptionTextLength = parsedDescriptionText.length;
-        if (parsedDescriptionTextLength > 0) {
-          title = `${parsedDescriptionText.slice(0, 50)}${
-            parsedDescriptionTextLength > 50 ? "..." : ""
-          }`;
+        const extractedTitleSnippet = getTitleSnippetFromContentText(
+          parsedDescriptionDocument.body.textContent
+        );
+        if (extractedTitleSnippet) {
+          title = extractedTitleSnippet;
         }
       }
     }
@@ -258,12 +259,11 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
           rawContentText,
           "text/html"
         );
-        const parsedContentText = parsedContentDocument.body.textContent.trim();
-        const parsedDescriptionTextLength = parsedContentText.length;
-        if (parsedDescriptionTextLength > 0) {
-          title = `${parsedContentText.slice(0, 50)}${
-            parsedDescriptionTextLength > 50 ? "..." : ""
-          }`;
+        const extractedTitleSnippet = getTitleSnippetFromContentText(
+          parsedContentDocument.body.textContent
+        );
+        if (extractedTitleSnippet) {
+          title = extractedTitleSnippet;
         }
       }
     }

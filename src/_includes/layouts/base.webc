@@ -18,5 +18,7 @@
   </head>
   <body>
     <template @raw="content" webc:nokeep></template>
+
+    <script @raw="getBundle('js')" type="module" webc:keep></script>
   </body>
 </html>
