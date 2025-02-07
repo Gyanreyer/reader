@@ -79,7 +79,7 @@ class ArticlesList extends LitElement {
       <ul>
         ${this._articles?.map(
           (article) => html`<li>
-            <a href="${article.url}">
+            <a href="${article.url}" target="article-frame">
               ${article.thumbnailURL
                 ? html`<img src="${article.thumbnailURL}" alt="" />`
                 : html`<div>No image</div>`}
