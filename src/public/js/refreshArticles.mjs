@@ -252,15 +252,18 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
   const parsedArticles = {};
 
   for (const entry of entries) {
-    const articleURL = entry
-      .querySelector("link")
-      ?.getAttribute("href")
-      ?.trim();
+    const articleURL = (
+      entry.querySelector("link")?.getAttribute("href") ||
+      // Try to recover from a missing link by checking for a URL in an <id>/<guid> tag;
+      // these are usually also the article URL
+      (entry.querySelector("id") || entry.querySelector("guid"))?.textContent
+    )?.trim();
     if (!articleURL || !URL.canParse(articleURL)) {
       console.error(
         `Entry in Atom feed ${feedURL} is missing a valid URL link`,
         entry.outerHTML
       );
+      continue;
     }
 
     let title = entry.querySelector("title")?.textContent.trim() ?? null;
@@ -321,14 +324,26 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
  * @param {string} feedURL
  */
 export async function refreshArticlesForFeed(feedURL) {
-  const feedEtag =
-    (await db.etags.where("url").equals(feedURL).first())?.etag ?? null;
+  const feedEtagData =
+    (await db.etags.where("url").equals(feedURL).first()) ?? null;
+
+  let headers;
+  if (feedEtagData) {
+    if (feedEtagData.etag) {
+      headers = {
+        "If-None-Match": feedEtagData.etag,
+      };
+    } else if (feedEtagData.lastModified) {
+      // Some hosts which don't support etags may still support If-Modified-Since
+      headers = {
+        "If-Modified-Since": feedEtagData.lastModified,
+      };
+    }
+  }
 
   const feedResponse = await proxiedFetch(feedURL, {
     method: "GET",
-    headers: {
-      "If-None-Match": feedEtag,
-    },
+    headers,
   });
 
   if (feedResponse.status === 304) {
@@ -342,9 +357,16 @@ export async function refreshArticlesForFeed(feedURL) {
     );
   }
 
-  const newEtag = feedResponse.headers.get("etag");
+  const newEtag = feedResponse.headers.get("Etag");
   if (newEtag) {
     db.etags.put({ url: feedURL, etag: newEtag });
+  } else {
+    const lastModified =
+      feedResponse.headers.get("Last-Modified") ||
+      // Fall back to the current date if the response doesn't provide a last modified header
+      // Last-Modified dates are always in UTC
+      new Date().toUTCString();
+    db.etags.put({ url: feedURL, lastModified });
   }
 
   const feedText = await feedResponse.text();
