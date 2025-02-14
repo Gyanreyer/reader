@@ -6,7 +6,7 @@ export async function refreshFeeds() {
   const feedsEtag =
     (await db.etags.where("url").equals(FEEDS_URL).first()) ?? null;
 
-  const feedsResponse = await fetch("feeds.opml", {
+  const feedsResponse = await fetch(FEEDS_URL, {
     method: "GET",
     headers: {
       "If-None-Match": feedsEtag,

@@ -2,6 +2,7 @@ import { db } from "./db.mjs";
 import { getMetadataForURL } from "./getOGImageForURL.mjs";
 import { refreshFeeds } from "./refreshFeeds.mjs";
 import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.mjs";
+import { proxiedFetch } from "./utils/proxiedFetch.mjs";
 
 const domParser = new DOMParser();
 
@@ -312,7 +313,7 @@ export async function refreshArticlesForFeed(feedURL) {
   const feedEtag =
     (await db.etags.where("url").equals(feedURL).first()) ?? null;
 
-  const feedResponse = await fetch(feedURL, {
+  const feedResponse = await proxiedFetch(feedURL, {
     method: "GET",
     headers: {
       "If-None-Match": feedEtag,

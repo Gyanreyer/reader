@@ -19,8 +19,6 @@ export default function (eleventyConfig) {
     components: ["src/_components/**/*.webc"],
   });
 
-  eleventyConfig.addPlugin;
-
   // Trigger a hot reload when a JS/CSS file changes
   eleventyConfig.addWatchTarget("src/**/*.{js,mjs,css}");
 

@@ -1,3 +1,5 @@
+import { proxiedFetch } from "./utils/proxiedFetch.mjs";
+
 const domParser = new DOMParser();
 
 /**
@@ -8,7 +10,8 @@ const domParser = new DOMParser();
  * } | null>}
  */
 export async function getMetadataForURL(url) {
-  const response = await fetch(url, {
+  const response = await proxiedFetch(url, {
+    method: "GET",
     headers: {
       "Content-Type": "text/html",
     },
