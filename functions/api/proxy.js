@@ -32,22 +32,27 @@ export const onRequest = async (context) => {
     );
   }
 
-  const proxiedResponse = await fetch(proxyURL, {
-    method: context.request.method,
-    headers: context.request.headers,
-    body: context.request.body,
-  });
+  try {
+    const proxiedResponse = await fetch(proxyURL, {
+      method: context.request.method,
+      headers: context.request.headers,
+      body: context.request.body,
+    });
 
-  if (proxiedResponse.ok) {
-    const requestEtag = context.request.headers.get("If-None-Match");
-    if (requestEtag && proxiedResponse.headers.get("Etag") === requestEtag) {
-      // Cancel the proxied response body stream to hopefully save some wasted bandwidth
-      proxiedResponse.body.cancel();
-      return new Response(null, {
-        status: 304,
-      });
+    if (proxiedResponse.ok) {
+      const requestEtag = context.request.headers.get("If-None-Match");
+      if (requestEtag && proxiedResponse.headers.get("Etag") === requestEtag) {
+        // Cancel the proxied response body stream to hopefully save some wasted bandwidth
+        proxiedResponse.body.cancel();
+        return new Response(null, {
+          status: 304,
+        });
+      }
     }
+    return proxiedResponse;
+  } catch (e) {
+    return new Response(`Failed to proxy request to ${proxyURL}`, {
+      status: 500,
+    });
   }
-
-  return proxiedResponse;
 };

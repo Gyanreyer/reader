@@ -1,5 +1,5 @@
 import { db } from "./db.mjs";
-// import { getMetadataForURL } from "./getOGImageForURL.mjs";
+// import { getMetadataForURL } from "./getMetadataForURL.mjs";
 import { refreshFeeds } from "./refreshFeeds.mjs";
 import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.mjs";
 import { proxiedFetch } from "./utils/proxiedFetch.mjs";
@@ -146,9 +146,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
       url: item.url,
       title,
       thumbnailURL,
-      publishedAt: dateTimestamp
-        ? new Date(dateTimestamp.trim()).getTime()
-        : Date.now(),
+      publishedAt: dateTimestamp ? new Date(dateTimestamp.trim()).getTime() : 0,
     };
   }
 
@@ -202,7 +200,9 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
 
     title = title ? title.trim() : null;
 
-    const dateTimestamp = item.querySelector("pubDate")?.textContent.trim();
+    const dateTimestamp = (
+      item.querySelector("pubDate") || item.getElementsByTagName("dc:date")?.[0]
+    )?.textContent.trim();
 
     /**
      * @type {string | null}
@@ -231,9 +231,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
       url: articleURL,
       title,
       thumbnailURL,
-      publishedAt: dateTimestamp
-        ? new Date(dateTimestamp).getTime()
-        : Date.now(),
+      publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
     };
   }
 
@@ -311,9 +309,7 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
       url: articleURL,
       title,
       thumbnailURL,
-      publishedAt: dateTimestamp
-        ? new Date(dateTimestamp).getTime()
-        : Date.now(),
+      publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
     };
   }
 

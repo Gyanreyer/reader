@@ -8,4 +8,4 @@ description: "Ryan's RSS Feed Reader"
 
 <articles-list></articles-list>
 <iframe name="article-frame"></iframe>
-<script src="/js/refreshArticles.mjs" webc:keep type="module"></script>
+<script src="/js/refreshArticles.mjs" webc:keep type="module" crossorigin="anonymous"></script>

@@ -1,4 +1,4 @@
-import { html, LitElement } from "/lib/lit-core.mjs";
+import { css, html, LitElement } from "/lib/lit-core.mjs";
 import { liveQuery } from "/lib/dexie.mjs";
 import { db } from "/js/db.mjs";
 
@@ -11,11 +11,7 @@ import { db } from "/js/db.mjs";
  * }} Article
  */
 
-class ArticlesList extends LitElement {
-  static {
-    customElements.define("articles-list", ArticlesList);
-  }
-
+export class ArticlesList extends LitElement {
   static get properties() {
     return {
       _articles: {
@@ -23,6 +19,26 @@ class ArticlesList extends LitElement {
       },
     };
   }
+
+  static styles = css`
+    ul {
+      list-style-type: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    article {
+      padding: 0.5rem 1rem;
+      background: bisque;
+      border-radius: 0.5rem;
+    }
+
+    article h2 {
+      margin: 0;
+    }
+  `;
 
   constructor() {
     super();
@@ -38,6 +54,7 @@ class ArticlesList extends LitElement {
       return db.articles
         .orderBy("publishedAt")
         .desc()
+        .limit(100)
         .filter(
           (article) =>
             article.readAt === null || article.readAt > fiveMinutesAgo
@@ -74,24 +91,63 @@ class ArticlesList extends LitElement {
     });
   }
 
+  _onClickArticle(event) {
+    const articleURL = event.currentTarget.href;
+    if (!articleURL) {
+      return;
+    }
+
+    // Mark the article as read
+    db.articles.update(articleURL, {
+      readAt: Date.now(),
+    });
+  }
+
+  _onClickMarkUnread(event) {
+    const articleURL =
+      event.currentTarget.closest("article")?.dataset.articleUrl;
+    if (!articleURL) {
+      return;
+    }
+
+    // Mark the article as unread
+    db.articles.update(articleURL, {
+      readAt: null,
+    });
+  }
+
   render() {
     return html`
       <ul>
         ${this._articles?.map(
           (article) => html`<li>
-            <a href="${article.url}" target="article-frame">
-              ${article.thumbnailURL
-                ? html`<img src="${article.thumbnailURL}" alt="" />`
-                : html`<div>No image</div>`}
-              ${article.title}
-              <div>Feed: ${article.feedTitle}</div>
-              <div>
-                Published at: ${new Date(article.publishedAt).toLocaleString()}
-              </div>
-            </a>
+            <article data-article-url="${article.url}">
+              <h2><a href="${article.url}" target="_blank" @click="${
+            this._onClickArticle
+          }">${article.title}</a></h2>
+                ${
+                  article.thumbnailURL
+                    ? html`<img src="${article.thumbnailURL}" alt="" />`
+                    : null
+                }
+                <p>${article.feedTitle}</p>
+                <p>${new Date(article.publishedAt).toLocaleString()}</p>
+                ${
+                  article.readAt
+                    ? html`<button @click=${this._onClickMarkUnread}>
+                        Mark unread
+                      </button>`
+                    : null
+                }
+              </a>
+            </article>
           </li>`
         ) ?? ""}
       </ul>
     `;
+  }
+
+  static {
+    customElements.define("articles-list", ArticlesList);
   }
 }
