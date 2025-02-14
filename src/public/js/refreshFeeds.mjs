@@ -4,7 +4,7 @@ const FEEDS_URL = new URL("/feeds.opml", window.location.origin).toString();
 
 export async function refreshFeeds() {
   const feedsEtag =
-    (await db.etags.where("url").equals(FEEDS_URL).first()) ?? null;
+    (await db.etags.where("url").equals(FEEDS_URL).first())?.etag ?? null;
 
   const feedsResponse = await fetch(FEEDS_URL, {
     method: "GET",

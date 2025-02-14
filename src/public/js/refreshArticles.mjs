@@ -311,7 +311,7 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
  */
 export async function refreshArticlesForFeed(feedURL) {
   const feedEtag =
-    (await db.etags.where("url").equals(feedURL).first()) ?? null;
+    (await db.etags.where("url").equals(feedURL).first())?.etag ?? null;
 
   const feedResponse = await proxiedFetch(feedURL, {
     method: "GET",
