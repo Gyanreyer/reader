@@ -121,7 +121,9 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
       }
     }
 
-    const dateTimestamp = item.date_published || item.date_modified;
+    title = title.trim();
+
+    let dateTimestamp = item.date_published || item.date_modified;
 
     /**
      * @type {string | null}
@@ -142,10 +144,10 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
 
     parsedArticles[item.url] = {
       url: item.url,
-      title: title,
+      title,
       thumbnailURL,
       publishedAt: dateTimestamp
-        ? new Date(dateTimestamp).getTime()
+        ? new Date(dateTimestamp.trim()).getTime()
         : Date.now(),
     };
   }
@@ -167,7 +169,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
   const parsedArticles = {};
 
   for (const item of items) {
-    const articleURL = item.querySelector("link")?.textContent;
+    const articleURL = item.querySelector("link")?.textContent.trim();
     if (!articleURL || !URL.canParse(articleURL)) {
       console.error(
         `Item in RSS feed ${feedURL} has missing or invalid link URL`,
@@ -175,6 +177,9 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
       );
     }
 
+    /**
+     * @type {string | null}
+     */
     let title = null;
     const titleTagText = item.querySelector("title")?.textContent;
     if (titleTagText) {
@@ -195,7 +200,9 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
       }
     }
 
-    const dateTimestamp = item.querySelector("pubDate")?.textContent;
+    title = title ? title.trim() : null;
+
+    const dateTimestamp = item.querySelector("pubDate")?.textContent.trim();
 
     /**
      * @type {string | null}
@@ -217,6 +224,8 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
         thumbnailURL = imageEnclosureURL;
       }
     }
+
+    thumbnailURL = thumbnailURL ? thumbnailURL.trim() : null;
 
     parsedArticles[articleURL] = {
       url: articleURL,
@@ -243,7 +252,10 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
   const parsedArticles = {};
 
   for (const entry of entries) {
-    const articleURL = entry.querySelector("link")?.getAttribute("href").trim();
+    const articleURL = entry
+      .querySelector("link")
+      ?.getAttribute("href")
+      ?.trim();
     if (!articleURL || !URL.canParse(articleURL)) {
       console.error(
         `Entry in Atom feed ${feedURL} is missing a valid URL link`,
@@ -264,15 +276,14 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
           parsedContentDocument.body.textContent
         );
         if (extractedTitleSnippet) {
-          title = extractedTitleSnippet;
+          title = extractedTitleSnippet.trim();
         }
       }
     }
 
-    let dateTimestamp = entry.querySelector("published")?.textContent;
-    if (!dateTimestamp) {
-      dateTimestamp = entry.querySelector("updated")?.textContent;
-    }
+    const dateTimestamp = (
+      entry.querySelector("published") || entry.querySelector("updated")
+    )?.textContent.trim();
     if (!dateTimestamp) {
       console.error(
         `Entry in feed ${feedURL} is missing a published or updated date. Will fall back to current date.`,

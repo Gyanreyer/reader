@@ -38,5 +38,16 @@ export const onRequest = async (context) => {
     body: context.request.body,
   });
 
+  if (proxiedResponse.ok) {
+    const requestEtag = context.request.headers.get("If-None-Match");
+    if (requestEtag && proxiedResponse.headers.get("Etag") === requestEtag) {
+      // Cancel the proxied response body stream to hopefully save some wasted bandwidth
+      proxiedResponse.body.cancel();
+      return new Response(null, {
+        status: 304,
+      });
+    }
+  }
+
   return proxiedResponse;
 };
