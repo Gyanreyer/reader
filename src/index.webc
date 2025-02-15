@@ -7,5 +7,5 @@ description: "Ryan's RSS Feed Reader"
 ---
 
 <articles-list></articles-list>
-<iframe name="article-frame"></iframe>
 <script src="/js/refreshArticles.mjs" webc:keep type="module" crossorigin="anonymous"></script>
+<script src="/js/components/articles-list/articles-list.mjs" webc:keep type="module" crossorigin="anonymous"></script>

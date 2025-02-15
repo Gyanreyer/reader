@@ -23,7 +23,25 @@ export async function getMetadataForURL(url) {
     return null;
   }
 
-  const html = await response.text();
+  if (!response.body) {
+    console.error("Response has no body");
+    return null;
+  }
+
+  let html = "";
+
+  const stream = response.body.pipeThrough(new TextDecoderStream());
+
+  for await (const chunk of stream) {
+    const endOfHeadIndex = chunk.indexOf("</head");
+    if (endOfHeadIndex >= 0) {
+      // If we reached the end of the head, we can stop reading the response body
+      html += chunk.slice(0, endOfHeadIndex);
+      break;
+    }
+
+    html += chunk;
+  }
 
   const parsedDocument = domParser.parseFromString(html, "text/html");
 
@@ -60,5 +78,8 @@ export async function getMetadataForURL(url) {
     thumbnailURL = ogImageURL;
   }
 
-  return null;
+  return {
+    title,
+    thumbnailURL,
+  };
 }

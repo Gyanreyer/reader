@@ -45,21 +45,6 @@ async function updateSavedArticles(feedURL, parsedArticles) {
       Array.from(articleURLsToAdd.values()).map(async (articleURL) => {
         const articleData = parsedArticles[articleURL];
 
-        // if (!articleData.thumbnailURL || !articleData.title) {
-        //   try {
-        //     const { title, thumbnailURL } = await getMetadataForURL(
-        //       articleData.url
-        //     );
-        //     articleData.title = articleData.title || title;
-        //     articleData.thumbnailURL = articleData.thumbnailURL || thumbnailURL;
-        //   } catch (error) {
-        //     console.error(
-        //       `Failed to fetch metadata for article URL ${articleData.url}:`,
-        //       error
-        //     );
-        //   }
-        // }
-
         return db.articles.put({
           feedURL,
           readAt: null,
