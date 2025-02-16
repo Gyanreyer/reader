@@ -6,6 +6,9 @@ import { proxiedFetch } from "./utils/proxiedFetch.mjs";
 
 const domParser = new DOMParser();
 
+const sanitizeTitle = (title) =>
+  domParser.parseFromString(title, "text/html").body.textContent.trim();
+
 /**
  * @typedef {{
  *    url: string;
@@ -85,7 +88,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
      */
     let title = null;
     if (typeof item.title === "string") {
-      title = item.title;
+      title = sanitizeTitle(item.title);
     } else if (item.content_text && typeof item.content_text === "string") {
       const extractedTitleSnippet = getTitleSnippetFromContentText(
         item.content_text
@@ -105,8 +108,6 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
         title = extractedTitleSnippet;
       }
     }
-
-    title = title.trim();
 
     let dateTimestamp = item.date_published || item.date_modified;
 
@@ -166,7 +167,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
     let title = null;
     const titleTagText = item.querySelector("title")?.textContent;
     if (titleTagText) {
-      title = titleTagText;
+      title = sanitizeTitle(titleTagText);
     } else {
       const rawDescriptionText = item.querySelector("description")?.textContent;
       if (rawDescriptionText) {
@@ -182,8 +183,6 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
         }
       }
     }
-
-    title = title ? title.trim() : null;
 
     const dateTimestamp = (
       item.querySelector("pubDate") || item.getElementsByTagName("dc:date")?.[0]
@@ -249,7 +248,11 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
       continue;
     }
 
-    let title = entry.querySelector("title")?.textContent.trim() ?? null;
+    let title = null;
+    const titleTag = entry.querySelector("title");
+    if (titleTag) {
+      title = sanitizeTitle(titleTag.textContent);
+    }
 
     if (!title) {
       const rawContentText = entry.querySelector("content")?.textContent;
