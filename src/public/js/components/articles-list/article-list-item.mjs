@@ -35,7 +35,11 @@ export class ArticleListItem extends LitElement {
 
   static styles = css`
     article {
-      padding: 0.5rem 1rem;
+      --menu-button-size: 1.5rem;
+      --inline-padding: 0.75rem;
+      padding-block: 1rem;
+      padding-inline-start: var(--inline-padding);
+      padding-inline-end: calc(var(--menu-button-size) + var(--inline-padding));
       background: bisque;
       border-radius: 0.5rem;
       display: flex;
@@ -44,20 +48,20 @@ export class ArticleListItem extends LitElement {
       position: relative;
     }
 
-    article *:focus {
-      outline: 2px solid blue;
-    }
-
-    article h2 {
-      margin: 0 0 0.5rem;
+    article[data-read="true"] {
+      opacity: 0.7;
     }
 
     article img {
-      max-width: 50vw;
-      max-height: 25vh;
+      max-width: min(100%, 420px);
+      aspect-ratio: 16/9;
       border-radius: 4px;
-      object-fit: contain;
-      object-position: left;
+      object-fit: cover;
+      margin-block-end: 0.25rem;
+    }
+
+    article h2 {
+      margin: 0;
     }
 
     article p {
@@ -76,10 +80,11 @@ export class ArticleListItem extends LitElement {
       justify-content: center;
       border-radius: 4px;
       border: 1px solid black;
+      width: var(--menu-button-size);
     }
 
     button[popovertarget="menu-popover"] svg {
-      width: 1.5rem;
+      width: 100%;
       height: auto;
     }
   `;
@@ -159,14 +164,14 @@ export class ArticleListItem extends LitElement {
     });
   }
 
-  _onClickMarkUnread() {
-    // Mark the article as unread
+  _onClickToggleRead() {
     db.articles.update(this._article.url, {
-      readAt: null,
+      readAt: this._article.readAt ? null : Date.now(),
     });
   }
 
   willUpdate(changedProperties) {
+    super.willUpdate(changedProperties);
     if (
       (changedProperties.has("isVisible") ||
         changedProperties.has("_article")) &&
@@ -190,15 +195,20 @@ export class ArticleListItem extends LitElement {
 
     const { url, title, thumbnailURL, publishedAt, readAt } = this._article;
 
-    return html`<article>
+    return html`<article data-read="${readAt !== null}">
+      ${thumbnailURL && thumbnailURL !== NO_THUMBNAIL
+        ? html`<img
+            src="${thumbnailURL}"
+            alt=""
+            loading="lazy"
+            onerror="this.style.display = 'none'"
+          />`
+        : null}
       <h2>
         <a href="${url}" target="_blank" @click="${this._onClickArticleLink}"
           >${title}</a
         >
       </h2>
-      ${thumbnailURL && thumbnailURL !== NO_THUMBNAIL
-        ? html`<img src="${thumbnailURL}" alt="" loading="lazy" />`
-        : null}
       <p>${this._feedTitle}</p>
       <p>${new Date(publishedAt).toLocaleString()}</p>
       <button popovertarget="menu-popover">
@@ -207,11 +217,9 @@ export class ArticleListItem extends LitElement {
         </svg>
       </button>
       <div popover id="menu-popover">
-        ${readAt
-          ? html`<button @click=${this._onClickMarkUnread} id="mark-unread">
-              Mark unread
-            </button>`
-          : null}
+        <button @click=${this._onClickToggleRead} id="toggle-read">
+          Mark as ${readAt ? "unread" : "read"}
+        </button>
       </div>
     </article>`;
   }
