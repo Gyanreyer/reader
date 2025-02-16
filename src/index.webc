@@ -6,6 +6,44 @@ title: "Feed Reader"
 description: "Ryan's RSS Feed Reader"
 ---
 
-<articles-list></articles-list>
-<script src="/js/refreshArticles.mjs" webc:keep type="module" crossorigin="anonymous"></script>
-<script src="/js/components/articles-list/articles-list.mjs" webc:keep type="module" crossorigin="anonymous"></script>
+<div id="root">
+  <aside>
+    <nav>
+      <feeds-list></feeds-list>
+    </nav>
+  </aside>
+  <main>
+    <articles-list></articles-list>
+  </main>
+</div>
+<style>
+  #root {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 0.5rem;
+  }
+
+  aside {
+    background-color: aliceblue;
+    border-right: 1px solid black;
+    padding: 1rem;
+  }
+</style>
+<script
+  src="/js/refreshArticles.mjs"
+  webc:keep
+  type="module"
+  crossorigin="anonymous"
+></script>
+<script
+  src="/js/components/articles-list/articles-list.mjs"
+  webc:keep
+  type="module"
+  crossorigin="anonymous"
+></script>
+<script
+  src="/js/components/feeds-list/feeds-list.mjs"
+  webc:keep
+  type="module"
+  crossorigin="anonymous"
+></script>

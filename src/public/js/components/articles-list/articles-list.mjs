@@ -1,5 +1,4 @@
 import { css, html, LitElement } from "/lib/lit-core.mjs";
-import { liveQuery } from "/lib/dexie.mjs";
 import { db } from "/js/db.mjs";
 
 import "./article-list-item.mjs";
@@ -34,25 +33,28 @@ export class ArticlesList extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    this._refreshArticlesQuery();
+  }
 
-    const articleURLsObservable = liveQuery(() => {
-      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-      return db.articles
-        .orderBy("publishedAt")
-        .desc()
-        .limit(100)
-        .filter(
-          (article) =>
-            article.readAt === null || article.readAt > fiveMinutesAgo
-        )
-        .primaryKeys();
-    });
+  _refreshArticlesQuery() {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
-    articleURLsObservable.subscribe({
-      next: (articles) => {
-        this._articleURLs = articles;
-      },
-    });
+    const searchParams = new URLSearchParams(window.location.search);
+    const filterFeedURL = searchParams.get("filter-feed-url");
+
+    db.articles
+      .orderBy("publishedAt")
+      .desc()
+      .filter(
+        (article) =>
+          (filterFeedURL ? article.feedURL === filterFeedURL : true) &&
+          (article.readAt === null || article.readAt > fiveMinutesAgo)
+      )
+      .limit(100)
+      .primaryKeys()
+      .then((urls) => {
+        this._articleURLs = urls;
+      });
   }
 
   render() {
