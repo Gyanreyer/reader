@@ -6,6 +6,11 @@
  * @type {PagesFunction}
  */
 export const onRequest = async (context) => {
+  const responseHeaders = new Headers({
+    "Access-Control-Allow-Origin": "https://reader.geyer.dev",
+    "Access-Control-Allow-Methods": "GET",
+  });
+
   /**
    * @type {URL}
    */
@@ -18,6 +23,7 @@ export const onRequest = async (context) => {
       {
         // This shouldn't happen, so it's an internal server error
         status: 500,
+        headers: responseHeaders,
       }
     );
   }
@@ -28,6 +34,7 @@ export const onRequest = async (context) => {
       `No proxy URL param provided on request URL ${requestURL.toString()}`,
       {
         status: 400,
+        headers: responseHeaders,
       }
     );
   }
@@ -46,13 +53,25 @@ export const onRequest = async (context) => {
         proxiedResponse.body.cancel();
         return new Response(null, {
           status: 304,
+          responseHeaders,
         });
       }
     }
-    return proxiedResponse;
+
+    proxiedResponse.headers.forEach((value, key) => {
+      // Apply the proxied response headers to the responseHeaders object
+      responseHeaders.append(key, value);
+    });
+
+    return new Response(proxiedResponse.body, {
+      status: proxiedResponse.status,
+      statusText: proxiedResponse.statusText,
+      headers: responseHeaders,
+    });
   } catch (e) {
     return new Response(`Failed to proxy request to ${proxyURL}`, {
       status: 500,
+      responseHeaders,
     });
   }
 };
