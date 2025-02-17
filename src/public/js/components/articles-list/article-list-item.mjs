@@ -10,22 +10,20 @@ import { getMetadataForURL } from "../../getMetadataForURL.mjs";
 const NO_THUMBNAIL = "NO_THUMBNAIL";
 
 export class ArticleListItem extends LitElement {
-  static get properties() {
-    return {
-      url: {
-        type: String,
-      },
-      _article: {
-        state: true,
-      },
-      _feedTitle: {
-        state: true,
-      },
-      isVisible: {
-        state: true,
-      },
-    };
-  }
+  static properties = {
+    url: {
+      type: String,
+    },
+    _article: {
+      state: true,
+    },
+    _feedTitle: {
+      state: true,
+    },
+    isVisible: {
+      state: true,
+    },
+  };
 
   static styles = css`
     article {

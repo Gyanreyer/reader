@@ -47,6 +47,7 @@ export class FeedsList extends LitElement {
   render() {
     return html`
       <ul>
+        <a href="?">All</a>
         ${this._feeds?.map(
           (feed) =>
             html`<li>

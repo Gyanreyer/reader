@@ -6,31 +6,47 @@ title: "Feed Reader"
 description: "Ryan's RSS Feed Reader"
 ---
 
-<div id="root">
-  <side-bar>
-    <aside>
-      <nav>
-        <feeds-list></feeds-list>
-      </nav>
-    </aside>
-  </side-bar>
-  <main>
-    <articles-list></articles-list>
-  </main>
-</div>
+<side-bar data-collapsed>
+  <aside>
+    <nav>
+      <feeds-list></feeds-list>
+    </nav>
+  </aside>
+</side-bar>
+<main>
+  <articles-list></articles-list>
+</main>
 <style>
-  #root {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 0.5rem;
+  body {
+    margin: 0;
+    overflow-x: clip;
+    --side-bar-width: min(12rem, 40vw);
   }
 
-  aside {
+  side-bar {
     background-color: aliceblue;
     border-right: 1px solid black;
-    padding: 1rem;
-    max-width: 30vw;
+    width: var(--side-bar-width);
+    z-index: 1;
   }
+
+  main {
+    padding: 0 1rem;
+    transition: transform 0.2s;
+  }
+
+  side-bar:not([data-collapsed]) + main {
+    transform: translateX(calc(var(--side-bar-width) + 1rem));
+  }
+
+  side-bar aside {
+    box-sizing: border-box;
+    overflow-y: auto;
+    height: 100%;
+    padding-block: 1rem 4rem;
+    padding-inline: 1rem;
+  }
+
 </style>
 <script
   src="/js/entrypoints/index.mjs"
