@@ -177,10 +177,10 @@ export class ArticleListItem extends LitElement {
       this.isVisible &&
       this._article
     ) {
-      if (this._article.thumbnailURL === null) {
+      if (this._article.thumbnail === null) {
         getMetadataForURL(this._article.url).then((metadata) => {
           db.articles.update(this._article.url, {
-            thumbnailURL: metadata?.thumbnailURL ?? NO_THUMBNAIL,
+            thumbnail: metadata?.thumbnail ?? NO_THUMBNAIL,
           });
         });
       }
@@ -192,13 +192,13 @@ export class ArticleListItem extends LitElement {
       return;
     }
 
-    const { url, title, thumbnailURL, publishedAt, readAt } = this._article;
+    const { url, title, thumbnail, publishedAt, readAt } = this._article;
 
     return html`<article data-read="${readAt !== null}">
-      ${thumbnailURL && thumbnailURL !== NO_THUMBNAIL
+      ${thumbnail && thumbnail !== NO_THUMBNAIL
         ? html`<img
-            src="${thumbnailURL}"
-            alt=""
+            src="${thumbnail.url}"
+            alt="${thumbnail.alt}"
             loading="lazy"
             onerror="this.style.display = 'none'"
           />`

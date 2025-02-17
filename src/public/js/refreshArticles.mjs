@@ -3,27 +3,21 @@ import { refreshFeeds } from "./refreshFeeds.mjs";
 import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.mjs";
 import { proxiedFetch } from "./utils/proxiedFetch.mjs";
 
+/**
+ * @import { Article } from './db.mjs';
+ */
+
 const domParser = new DOMParser();
 
 const sanitizeTitle = (title) =>
   domParser.parseFromString(title, "text/html").body.textContent.trim();
 
 /**
- * @typedef {{
- *    url: string;
- *    title: string;
- *    publishedAt: number;
- *    thumbnailURL: string | null;
- *  }} ParsedArticleData
- */
-
-/**
- * @param {string} feedURL
  * @param {{
- *  [articleURL: string]: ParsedArticleData;
+ *  [articleURL: string]: Article;
  * }} parsedArticles
  */
-async function updateSavedArticles(feedURL, parsedArticles) {
+async function updateSavedArticles(parsedArticles) {
   const allFoundArticleURLs = Object.keys(parsedArticles);
 
   const articleURLsToAdd = new Set(allFoundArticleURLs);
@@ -37,22 +31,15 @@ async function updateSavedArticles(feedURL, parsedArticles) {
         articleURLsToAdd.delete(article.url);
         const latestArticleData = parsedArticles[article.url];
         if (latestArticleData) {
-          article.feedURL = feedURL;
           article.title = latestArticleData.title;
           article.publishedAt = latestArticleData.publishedAt;
         }
       });
 
-    await Promise.allSettled(
-      Array.from(articleURLsToAdd.values()).map(async (articleURL) => {
-        const articleData = parsedArticles[articleURL];
-
-        return db.articles.put({
-          feedURL,
-          readAt: null,
-          ...articleData,
-        });
-      })
+    await db.articles.bulkPut(
+      Object.values(parsedArticles).filter((article) =>
+        articleURLsToAdd.has(article.url)
+      )
     );
   });
 }
@@ -70,7 +57,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
   }
 
   /**
-   * @type {Record<string, ParsedArticleData>} Parsed articles to add to the database
+   * @type {Record<string, import("./db.mjs").Article>} Parsed articles to add to the database
    */
   const parsedArticles = {};
 
@@ -130,12 +117,17 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
     parsedArticles[item.url] = {
       url: item.url,
       title,
-      thumbnailURL,
+      thumbnail: {
+        url: thumbnailURL,
+        alt: "",
+      },
       publishedAt: dateTimestamp ? new Date(dateTimestamp.trim()).getTime() : 0,
+      feedURL,
+      readAt: null,
     };
   }
 
-  await updateSavedArticles(feedURL, parsedArticles);
+  await updateSavedArticles(parsedArticles);
 }
 
 /**
@@ -148,7 +140,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
   const items = Array.from(feedDocument.getElementsByTagName("item"));
 
   /**
-   * @type {Record<string, ParsedArticleData>} Parsed articles to add to the database
+   * @type {Record<string, Article>} Parsed articles to add to the database
    */
   const parsedArticles = {};
 
@@ -214,12 +206,17 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
     parsedArticles[articleURL] = {
       url: articleURL,
       title,
-      thumbnailURL,
+      thumbnail: {
+        url: thumbnailURL,
+        alt: "",
+      },
       publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
+      readAt: null,
+      feedURL,
     };
   }
 
-  await updateSavedArticles(feedURL, parsedArticles);
+  await updateSavedArticles(parsedArticles);
 }
 
 /**
@@ -230,7 +227,7 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
   const entries = feedDocument.getElementsByTagName("entry");
 
   /**
-   * @type {Record<string, ParsedArticleData>} Parsed articles to add to the database
+   * @type {Record<string, Article>} Parsed articles to add to the database
    */
   const parsedArticles = {};
 
@@ -297,12 +294,17 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
     parsedArticles[articleURL] = {
       url: articleURL,
       title,
-      thumbnailURL,
+      thumbnail: {
+        url: thumbnailURL,
+        alt: "",
+      },
       publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
+      feedURL,
+      readAt: null,
     };
   }
 
-  await updateSavedArticles(feedURL, parsedArticles);
+  await updateSavedArticles(parsedArticles);
 }
 
 /**

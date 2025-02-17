@@ -4,10 +4,6 @@ const domParser = new DOMParser();
 
 /**
  * @param {string} url
- * @returns {Promise<{
- *  title: string,
- *  thumbnailURL: string,
- * } | null>}
  */
 export async function getMetadataForURL(url) {
   const response = await proxiedFetch(url, {
@@ -78,8 +74,17 @@ export async function getMetadataForURL(url) {
     thumbnailURL = ogImageURL;
   }
 
+  const thumbnailImageAlt =
+    parsedDocument
+      .querySelector("meta[property='og:image:alt']")
+      ?.getAttribute("content")
+      .trim() ?? "";
+
   return {
     title,
-    thumbnailURL,
+    thumbnail: {
+      url: thumbnailURL,
+      alt: thumbnailImageAlt,
+    },
   };
 }

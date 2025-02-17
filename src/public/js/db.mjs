@@ -27,7 +27,10 @@ import { Dexie } from "/lib/dexie.mjs";
  *  title: string;
  *  publishedAt: number;
  *  readAt: number | null;
- *  thumbnailURL: string | null | "NO_THUMBNAIL";
+ *  thumbnail: {
+ *    url: string;
+ *    alt: string;
+ *  } | "NO_THUMBNAIL" | null;
  * }} Article
  */
 
