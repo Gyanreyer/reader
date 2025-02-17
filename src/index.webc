@@ -7,11 +7,13 @@ description: "Ryan's RSS Feed Reader"
 ---
 
 <div id="root">
-  <aside>
-    <nav>
-      <feeds-list></feeds-list>
-    </nav>
-  </aside>
+  <side-bar>
+    <aside>
+      <nav>
+        <feeds-list></feeds-list>
+      </nav>
+    </aside>
+  </side-bar>
   <main>
     <articles-list></articles-list>
   </main>
@@ -27,22 +29,11 @@ description: "Ryan's RSS Feed Reader"
     background-color: aliceblue;
     border-right: 1px solid black;
     padding: 1rem;
+    max-width: 30vw;
   }
 </style>
 <script
-  src="/js/refreshArticles.mjs"
-  webc:keep
-  type="module"
-  crossorigin="anonymous"
-></script>
-<script
-  src="/js/components/articles-list/articles-list.mjs"
-  webc:keep
-  type="module"
-  crossorigin="anonymous"
-></script>
-<script
-  src="/js/components/feeds-list/feeds-list.mjs"
+  src="/js/entrypoints/index.mjs"
   webc:keep
   type="module"
   crossorigin="anonymous"

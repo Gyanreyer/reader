@@ -44,7 +44,7 @@ export class ArticlesList extends LitElement {
 
     db.articles
       .orderBy("publishedAt")
-      .desc()
+      .reverse()
       .filter(
         (article) =>
           (filterFeedURL ? article.feedURL === filterFeedURL : true) &&

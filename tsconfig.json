@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "/*": ["./src/public/*"]
+    },
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext"
+  },
+  "include": ["src/public/**/*.mjs", "src/public/**/*.d.ts"]
+}

@@ -1,5 +1,4 @@
 import { db } from "./db.mjs";
-// import { getMetadataForURL } from "./getMetadataForURL.mjs";
 import { refreshFeeds } from "./refreshFeeds.mjs";
 import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.mjs";
 import { proxiedFetch } from "./utils/proxiedFetch.mjs";
@@ -142,7 +141,8 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
 /**
  * We have to account for RSS 0.91, 0.92, and 2.0
  *
- * @param {Response} feedResponse
+ * @param {string} feedURL
+ * @param {Document} feedDocument
  */
 async function processRSSFeedResponse(feedURL, feedDocument) {
   const items = Array.from(feedDocument.getElementsByTagName("item"));
@@ -198,7 +198,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
       ?.getAttribute("url")
       .trim();
     if (mediaThumbnailURL && URL.canParse(mediaThumbnailURL)) {
-      thumbnailURL = mediaThumbnail;
+      thumbnailURL = mediaThumbnailURL;
     } else {
       const imageEnclosureURL = item
         .querySelector("enclosure[type^='image']")
@@ -223,7 +223,8 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
 }
 
 /**
- * @param {Response} feedResponse
+ * @param {string} feedURL
+ * @param {Document} feedDocument
  */
 async function processAtomFeedResponse(feedURL, feedDocument) {
   const entries = feedDocument.getElementsByTagName("entry");
@@ -414,13 +415,12 @@ export async function refreshAllArticles() {
   );
 
   for (let i = 0, numResults = results.length; i < numResults; ++i) {
-    if (results[i].status === "rejected") {
+    const result = results[i];
+    if (result.status === "rejected") {
       console.error(
         `Failed to refresh articles for feed ${feedURLs[i]}:`,
-        results[i].reason
+        result.reason
       );
     }
   }
 }
-
-refreshAllArticles();

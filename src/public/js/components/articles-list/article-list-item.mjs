@@ -4,13 +4,7 @@ import { db } from "/js/db.mjs";
 import { getMetadataForURL } from "../../getMetadataForURL.mjs";
 
 /**
- * @typedef {{
- *  url: string;
- *  title: string;
- *  thumbnailURL: string | null;
- *  publishedAt: number;
- *  readAt: number | null;
- * }} Article
+ * @import { Article } from '/js/db.mjs';
  */
 
 const NO_THUMBNAIL = "NO_THUMBNAIL";
@@ -109,6 +103,11 @@ export class ArticleListItem extends LitElement {
     super();
 
     /**
+     * @type {string}
+     */
+    this.url = "";
+
+    /**
      * @type {Article | null}
      */
     this._article = null;
@@ -190,7 +189,7 @@ export class ArticleListItem extends LitElement {
 
   render() {
     if (!this._article) {
-      return null;
+      return;
     }
 
     const { url, title, thumbnailURL, publishedAt, readAt } = this._article;

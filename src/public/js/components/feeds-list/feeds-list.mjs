@@ -2,10 +2,7 @@ import { css, html, LitElement } from "/lib/lit-core.mjs";
 import { db } from "/js/db.mjs";
 
 /**
- * @type {{
- *  url: string;
- *  title: string;
- * }} Feed
+ * @import { Feed } from '/js/db.mjs';
  */
 
 export class FeedsList extends LitElement {
