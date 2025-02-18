@@ -2,8 +2,8 @@ import { css, html, LitElement } from "/lib/lit-core.mjs";
 
 export class SideBar extends LitElement {
   static properties = {
-    isCollapsed: {
-      attribute: "data-collapsed",
+    isExpanded: {
+      attribute: "data-expanded",
       type: Boolean,
       reflect: true,
     },
@@ -15,57 +15,77 @@ export class SideBar extends LitElement {
       top: 0;
       left: 0;
       height: 100vh;
-      transition: transform 0.2s;
-    }
-
-    #sidebar-collapse-button {
-      position: absolute;
-      top: 50%;
-      left: 100%;
-      transform: translate(-50%, -50%);
-      transition: transform 0.2s;
-    }
-
-    #sidebar-collapse-button svg {
-      transition: transform 0.2s;
-    }
-
-    :host([data-collapsed]) {
       transform: translateX(-100%);
+      visibility: hidden;
+      transition-property: transform, opacity, visibility;
+      transition-duration: 0.2s;
+    }
 
-      & #sidebar-collapse-button {
-        transform: translate(-25%, -50%);
-      }
-      & #sidebar-collapse-button svg {
-        transform: scaleX(-1);
-      }
+    :host([data-expanded]) {
+      transform: none;
+      visibility: visible;
+      transition-duration: 0.2s, 0.2s, 0s;
+    }
+
+    #toggle-menu-button {
+      position: absolute;
+      top: 1rem;
+      left: calc(100% + 1rem);
+      visibility: visible;
+      transition: transform 0.2s;
+    }
+
+    :host([data-expanded]) #toggle-menu-button {
+      transform: translateX(calc(-50% - 1rem));
+    }
+
+    :host([data-expanded])
+      #toggle-menu-button
+      svg
+      use[href$="#hamburger-menu"] {
+      display: none;
+    }
+
+    :host(:not([data-expanded]))
+      #toggle-menu-button
+      svg
+      use[href$="#left-arrow"] {
+      display: none;
+    }
+
+    #close-button {
+      margin-inline-start: auto;
     }
   `;
 
   constructor() {
     super();
 
-    // this.isCollapsed = localStorage.getItem("sidebar-collapsed") === "true";
+    this.isExpanded = localStorage.getItem("sidebar-expanded") === "true";
   }
 
   _toggleCollapse() {
-    console.log("toggle", this.isCollapsed);
-    this.isCollapsed = !this.isCollapsed;
-    if (this.isCollapsed) {
-      localStorage.setItem("sidebar-collapsed", "true");
-    } else {
-      localStorage.removeItem("sidebar-collapsed");
-    }
+    this.isExpanded = !this.isExpanded;
+    localStorage.setItem("sidebar-expanded", String("true"));
   }
 
   render() {
-    return html`<slot></slot
-      ><button @click=${this._toggleCollapse} id="sidebar-collapse-button">
+    return html`
+      <button @click=${this._toggleCollapse} id="toggle-menu-button">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+          <use href="/spritesheet.svg#hamburger-menu"></use>
           <use href="/spritesheet.svg#left-arrow"></use>
         </svg>
-      </button>`;
+      </button>
+      <slot></slot>
+    `;
   }
+
+  /**
+ *       <button @click=${this._toggleCollapse} id="close-button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"></svg>
+      </button>
+ */
 
   static {
     customElements.define("side-bar", SideBar);

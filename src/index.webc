@@ -6,7 +6,7 @@ title: "Feed Reader"
 description: "Ryan's RSS Feed Reader"
 ---
 
-<side-bar data-collapsed>
+<side-bar>
   <aside>
     <nav>
       <feeds-list></feeds-list>
@@ -30,12 +30,17 @@ description: "Ryan's RSS Feed Reader"
     z-index: 1;
   }
 
+  side-bar:not(:defined) {
+    display: none;
+  }
+
   main {
-    padding: 0 1rem;
+    margin-block: 2.5rem;
+    margin-inline: 1rem;
     transition: transform 0.2s;
   }
 
-  side-bar:not([data-collapsed]) + main {
+  side-bar[data-expanded] + main {
     transform: translateX(calc(var(--side-bar-width) + 1rem));
   }
 
