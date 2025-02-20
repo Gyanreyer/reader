@@ -66,7 +66,7 @@ export class SideBar extends LitElement {
 
   _toggleCollapse() {
     this.isExpanded = !this.isExpanded;
-    localStorage.setItem("sidebar-expanded", String("true"));
+    localStorage.setItem("sidebar-expanded", String(this.isExpanded));
   }
 
   render() {

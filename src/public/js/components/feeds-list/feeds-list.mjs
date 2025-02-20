@@ -31,17 +31,18 @@ export class FeedsList extends LitElement {
      * @type {Feed[]}
      */
     this._feeds = [];
+
+    this._onFeedsUpdated = async () => {
+      this._feeds = await db.feeds.orderBy("title").toArray();
+    };
+    window.addEventListener("reader:feeds-updated", this._onFeedsUpdated);
+    this._onFeedsUpdated();
   }
 
-  connectedCallback() {
-    super.connectedCallback();
+  disconnectedCallback() {
+    super.disconnectedCallback();
 
-    db.feeds
-      .orderBy("title")
-      .toArray()
-      .then((feeds) => {
-        this._feeds = feeds;
-      });
+    window.removeEventListener("reader:feeds-updated", this._onFeedsUpdated);
   }
 
   render() {

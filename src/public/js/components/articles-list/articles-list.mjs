@@ -2,8 +2,11 @@ import { css, html, LitElement } from "/lib/lit-core.mjs";
 import { db } from "/js/db.mjs";
 
 import "./article-list-item.mjs";
+import { refreshAllArticles } from "/js/refreshArticles.mjs";
 
 export class ArticlesList extends LitElement {
+  static PAGE_SIZE = 48;
+
   static get properties() {
     return {
       _articleURLs: {
@@ -29,44 +32,105 @@ export class ArticlesList extends LitElement {
      * @type {string[]}
      */
     this._articleURLs = [];
+    this._totalArticleCount = 0;
+
+    /**
+     * @type {string[]}
+     */
+    this._feedURLs = [];
+
+    this._onFeedsUpdated = async () => {
+      this._feedURLs = await db.feeds.toCollection().primaryKeys();
+      this._hydrateArticlesList();
+    };
+    window.addEventListener("reader:feeds-updated", this._onFeedsUpdated);
+    this._onFeedsUpdated();
+
+    this._onArticlesUpdated = async () => {
+      this._hydrateArticlesList();
+    };
+    window.addEventListener("reader:articles-updated", this._onArticlesUpdated);
+    this._onArticlesUpdated();
+
+    refreshAllArticles();
   }
 
-  connectedCallback() {
-    super.connectedCallback();
-    this._refreshArticlesQuery();
+  disconnectedCallback() {
+    super.disconnectedCallback();
+
+    window.removeEventListener("reader:feeds-updated", this._onFeedsUpdated);
+    window.removeEventListener(
+      "reader:articles-updated",
+      this._onArticlesUpdated
+    );
   }
 
-  _refreshArticlesQuery() {
+  async _hydrateArticlesList() {
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
     const searchParams = new URLSearchParams(window.location.search);
     const filterFeedURL = searchParams.get("filter-feed-url");
 
-    db.articles
+    const feedSet = filterFeedURL
+      ? new Set([filterFeedURL])
+      : new Set(this._feedURLs);
+
+    // It's surprisingly faster to just get the full list of articles and filter/paginate them in memory. Hmm.
+    const allArticleURLs = await db.articles
       .orderBy("publishedAt")
       .reverse()
-      .filter(
+      .and(
         (article) =>
-          (filterFeedURL ? article.feedURL === filterFeedURL : true) &&
-          (article.readAt === null || article.readAt > fiveMinutesAgo)
+          (feedSet.has(article.feedURL) && article.readAt === null) ||
+          article.readAt === undefined ||
+          article.readAt > fiveMinutesAgo
       )
-      .limit(100)
-      .primaryKeys()
-      .then((urls) => {
-        this._articleURLs = urls;
-      });
+      .primaryKeys();
+
+    const currentPage = Number(searchParams.get("page")) || 1;
+
+    const pageStartIndex = (currentPage - 1) * ArticlesList.PAGE_SIZE;
+
+    this._articleURLs = allArticleURLs.slice(
+      pageStartIndex,
+      pageStartIndex + ArticlesList.PAGE_SIZE
+    );
+    this._totalArticleCount = allArticleURLs.length;
   }
 
   render() {
+    const searchParams = new URLSearchParams(window.location.search);
+    const filterFeedURL = searchParams.get("filter-feed-url");
+
+    const currentPageNumber = Number(searchParams.get("page")) || 1;
+
+    const nextPageParams = new URLSearchParams(searchParams);
+    nextPageParams.set("page", String(currentPageNumber + 1));
+
+    const previousPageParams = new URLSearchParams(searchParams);
+    previousPageParams.set("page", String(currentPageNumber - 1));
+
+    const hasPreviousPage = currentPageNumber > 1;
+    const hasNextPage =
+      this._totalArticleCount > currentPageNumber * ArticlesList.PAGE_SIZE;
+
     return html`
       <ul>
-        ${this._articleURLs?.map(
+        ${this._articleURLs.map(
           (url) =>
             html`<li>
               <article-list-item url=${url}></article-list-item>
             </li>`
-        ) ?? ""}
+        )}
       </ul>
+      <div>
+        ${hasPreviousPage
+          ? html`<a href="?${previousPageParams.toString()}">Previous page</a>`
+          : null}
+        ${hasNextPage
+          ? html`<a href="?${nextPageParams.toString()}">Next page</a>`
+          : null}
+      </div>
     `;
   }
 

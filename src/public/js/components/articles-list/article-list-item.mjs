@@ -121,31 +121,25 @@ export class ArticleListItem extends LitElement {
 
     this.isVisible = false;
 
-    this._articleSubscription = null;
+    this._articleSubscription = liveQuery(() =>
+      db.articles.get(this.url)
+    ).subscribe((article) => {
+      if (
+        article &&
+        (!this._article || this._article.feedURL !== article.feedURL)
+      ) {
+        db.feeds.get(article.feedURL).then((feed) => {
+          this._feedTitle = feed.title;
+        });
+      }
+      this._article = article;
+    });
   }
 
   connectedCallback() {
     super.connectedCallback();
 
     ArticleListItem.intersectionObserver.observe(this);
-
-    this._articleSubscription = liveQuery(() =>
-      db.articles.get(this.url)
-    ).subscribe({
-      next: (article) => {
-        if (
-          article &&
-          (!this._article || this._article.feedURL !== article.feedURL)
-        ) {
-          db.feeds.get(article.feedURL).then((feed) => {
-            this._feedTitle = feed.title;
-            this.requestUpdate();
-          });
-        }
-        this._article = article;
-        this.requestUpdate();
-      },
-    });
   }
 
   disconnectedCallback() {

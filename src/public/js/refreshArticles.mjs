@@ -425,4 +425,6 @@ export async function refreshAllArticles() {
       );
     }
   }
+
+  window.addEventListener("reader:articles-updated", refreshAllArticles);
 }

@@ -30,6 +30,23 @@ export const onRequest = async (context) => {
     );
   }
 
+  if (requestURL.hostname !== context.env.ALLOWED_ORIGIN) {
+    return new Response(
+      `Request origin ${requestURL.toString()} is not allowed`,
+      {
+        status: 403,
+        headers: responseHeaders,
+      }
+    );
+  }
+
+  if (context.request.method !== "GET") {
+    return new Response(`Method ${context.request.method} is not allowed`, {
+      status: 405,
+      headers: responseHeaders,
+    });
+  }
+
   const proxyURL = requestURL.searchParams.get("url");
   if (!proxyURL) {
     return new Response(
@@ -42,21 +59,47 @@ export const onRequest = async (context) => {
   }
 
   try {
+    const requestEtag = context.request.headers.get("If-None-Match");
+    const requestIfModifiedSince =
+      context.request.headers.get("If-Modified-Since");
+    const proxyRequestHeaders = new Headers({
+      "If-None-Match": requestEtag,
+      "If-Modified-Since": requestIfModifiedSince,
+    });
+
     const proxiedResponse = await fetch(proxyURL, {
       method: context.request.method,
-      headers: context.request.headers,
+      headers: proxyRequestHeaders,
       body: context.request.body,
     });
 
     if (proxiedResponse.ok) {
-      const requestEtag = context.request.headers.get("If-None-Match");
+      // Some servers include an Etag/Last-Modified header but still return a full 200 response
+      // even if the header indicates the resource is unchanged. In this case, we'll double-check
+      // the headers to see if we can return a 304 response to the client and save some bandwidth.
+
       if (requestEtag && proxiedResponse.headers.get("Etag") === requestEtag) {
-        // Cancel the proxied response body stream to hopefully save some wasted bandwidth
         proxiedResponse.body.cancel();
         return new Response(null, {
           status: 304,
           responseHeaders,
         });
+      }
+
+      if (requestIfModifiedSince) {
+        const responseLastModified =
+          proxiedResponse.headers.get("Last-Modified");
+        if (
+          responseLastModified &&
+          new Date(responseLastModified).getTime() <=
+            new Date(requestIfModifiedSince).getTime()
+        ) {
+          proxiedResponse.body.cancel();
+          return new Response(null, {
+            status: 304,
+            responseHeaders,
+          });
+        }
       }
     }
 

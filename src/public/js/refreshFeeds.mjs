@@ -2,6 +2,9 @@ import { db } from "./db.mjs";
 
 const FEEDS_URL = new URL("/feeds.opml", window.location.origin).toString();
 
+/**
+ * @returns {Promise<boolean>} true if the feed list changed, false otherwise
+ */
 export async function refreshFeeds() {
   const feedsEtag =
     (await db.etags.where("url").equals(FEEDS_URL).first())?.etag ?? null;
@@ -15,14 +18,14 @@ export async function refreshFeeds() {
 
   if (feedsResponse.status === 304) {
     // The feeds are unchanged, no need to update the database
-    return;
+    return false;
   }
 
   if (!feedsResponse.ok) {
     console.error(
       `Unable to refresh feed list: received ${feedsResponse.status} ${feedsResponse.statusText} response from feed list URL ${FEEDS_URL}`
     );
-    return;
+    return false;
   }
 
   const newEtag = feedsResponse.headers.get("etag");
@@ -65,14 +68,18 @@ export async function refreshFeeds() {
     updatedFeedData[feedURL] = { url: feedURL, title: feedTitle };
   }
 
-  await db.transaction("rw", db.feeds, async () => {
-    const allUpdatedFeedURLs = Object.keys(updatedFeedData);
-    await db.feeds.where("url").noneOf(allUpdatedFeedURLs).delete();
+  const allUpdatedFeedURLs = Object.keys(updatedFeedData);
 
-    await Promise.all(
-      allUpdatedFeedURLs.map((feedURL) =>
-        db.feeds.put(updatedFeedData[feedURL])
-      )
-    );
+  await db.transaction("rw", db.feeds, () => {
+    // Write all updated feeds to the DB
+    return Promise.all([
+      db.feeds.bulkPut(Object.values(updatedFeedData)),
+      // Delete feeds that are have been removed
+      db.feeds.where("url").noneOf(allUpdatedFeedURLs).delete(),
+    ]);
   });
+
+  window.dispatchEvent(new CustomEvent("reader:feeds-updated"));
+
+  return true;
 }
