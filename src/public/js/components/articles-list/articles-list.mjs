@@ -1,4 +1,4 @@
-import { css, html, LitElement } from "/lib/lit-core.mjs";
+import { css, html, LitElement, repeat } from "/lib/lit.mjs";
 import { db } from "/js/db.mjs";
 
 import "./article-list-item.mjs";
@@ -41,16 +41,16 @@ export class ArticlesList extends LitElement {
 
     this._onFeedsUpdated = async () => {
       this._feedURLs = await db.feeds.toCollection().primaryKeys();
-      this._hydrateArticlesList();
+      await this._hydrateArticlesList();
     };
     window.addEventListener("reader:feeds-updated", this._onFeedsUpdated);
-    this._onFeedsUpdated();
 
     this._onArticlesUpdated = async () => {
       this._hydrateArticlesList();
     };
     window.addEventListener("reader:articles-updated", this._onArticlesUpdated);
-    this._onArticlesUpdated();
+
+    this._onFeedsUpdated();
 
     refreshAllArticles();
   }
@@ -100,7 +100,6 @@ export class ArticlesList extends LitElement {
 
   render() {
     const searchParams = new URLSearchParams(window.location.search);
-    const filterFeedURL = searchParams.get("filter-feed-url");
 
     const currentPageNumber = Number(searchParams.get("page")) || 1;
 
@@ -116,7 +115,9 @@ export class ArticlesList extends LitElement {
 
     return html`
       <ul>
-        ${this._articleURLs.map(
+        ${repeat(
+          this._articleURLs,
+          (url) => url,
           (url) =>
             html`<li>
               <article-list-item url=${url}></article-list-item>

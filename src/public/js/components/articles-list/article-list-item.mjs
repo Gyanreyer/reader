@@ -1,4 +1,4 @@
-import { css, html, LitElement } from "/lib/lit-core.mjs";
+import { css, html, LitElement } from "/lib/lit.mjs";
 import { liveQuery } from "/lib/dexie.mjs";
 import { db } from "/js/db.mjs";
 import { getMetadataForURL } from "../../getMetadataForURL.mjs";

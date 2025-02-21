@@ -9,8 +9,6 @@ export const onRequest = async (context) => {
   const responseHeaders = new Headers({
     "Access-Control-Allow-Origin": "https://reader.geyer.dev",
     "Access-Control-Allow-Methods": "GET",
-    // Cache the proxied response for 5 minutes
-    "Cache-Control": "public, max-age=300",
   });
 
   /**

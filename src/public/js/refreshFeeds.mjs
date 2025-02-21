@@ -2,12 +2,13 @@ import { db } from "./db.mjs";
 
 const FEEDS_URL = new URL("/feeds.opml", window.location.origin).toString();
 
+const FEEDS_ETAG_LOCALSTORAGE_KEY = "feedsEtag";
+
 /**
  * @returns {Promise<boolean>} true if the feed list changed, false otherwise
  */
 export async function refreshFeeds() {
-  const feedsEtag =
-    (await db.etags.where("url").equals(FEEDS_URL).first())?.etag ?? null;
+  const feedsEtag = localStorage.getItem(FEEDS_ETAG_LOCALSTORAGE_KEY);
 
   const feedsResponse = await fetch(FEEDS_URL, {
     method: "GET",
@@ -28,8 +29,10 @@ export async function refreshFeeds() {
     return false;
   }
 
-  const newEtag = feedsResponse.headers.get("etag");
-  db.etags.put({ url: FEEDS_URL, etag: newEtag });
+  localStorage.setItem(
+    FEEDS_ETAG_LOCALSTORAGE_KEY,
+    feedsResponse.headers.get("Etag")
+  );
 
   const parser = new DOMParser();
   const feedsDocument = parser.parseFromString(
@@ -46,10 +49,7 @@ export async function refreshFeeds() {
 
   /**
    * @type {{
-   *  [feedURL: string]: {
-   *    url: string;
-   *    title: string;
-   *  }
+   *  [feedURL: string]: import("./db.mjs").Feed;
    * }}
    */
   const updatedFeedData = {};
@@ -65,7 +65,11 @@ export async function refreshFeeds() {
       continue;
     }
 
-    updatedFeedData[feedURL] = { url: feedURL, title: feedTitle };
+    updatedFeedData[feedURL] = {
+      url: feedURL,
+      title: feedTitle,
+      lastRefreshedAt: 0,
+    };
   }
 
   const allUpdatedFeedURLs = Object.keys(updatedFeedData);

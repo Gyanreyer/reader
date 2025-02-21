@@ -1,4 +1,4 @@
-import { css, html, LitElement } from "/lib/lit-core.mjs";
+import { css, html, LitElement } from "/lib/lit.mjs";
 import { db } from "/js/db.mjs";
 
 /**

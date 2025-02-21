@@ -1,5 +1,6 @@
 import { db } from "./db.mjs";
 import { refreshFeeds } from "./refreshFeeds.mjs";
+import { settings } from "./settings.mjs";
 import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.mjs";
 import { proxiedFetch } from "./utils/proxiedFetch.mjs";
 
@@ -9,7 +10,7 @@ import { proxiedFetch } from "./utils/proxiedFetch.mjs";
 
 const domParser = new DOMParser();
 
-const sanitizeTitle = (title) =>
+const sanitizeXMLTitle = (title) =>
   domParser.parseFromString(title, "text/html").body.textContent.trim();
 
 /**
@@ -42,6 +43,7 @@ async function updateSavedArticles(parsedArticles) {
       )
     );
   });
+  window.dispatchEvent(new Event("reader:articles-updated"));
 }
 
 /**
@@ -74,7 +76,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
      */
     let title = null;
     if (typeof item.title === "string") {
-      title = sanitizeTitle(item.title);
+      title = item.title.trim();
     } else if (item.content_text && typeof item.content_text === "string") {
       const extractedTitleSnippet = getTitleSnippetFromContentText(
         item.content_text
@@ -159,7 +161,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
     let title = null;
     const titleTagText = item.querySelector("title")?.textContent;
     if (titleTagText) {
-      title = sanitizeTitle(titleTagText);
+      title = sanitizeXMLTitle(titleTagText);
     } else {
       const rawDescriptionText = item.querySelector("description")?.textContent;
       if (rawDescriptionText) {
@@ -249,7 +251,7 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
     let title = null;
     const titleTag = entry.querySelector("title");
     if (titleTag) {
-      title = sanitizeTitle(titleTag.textContent);
+      title = sanitizeXMLTitle(titleTag.textContent);
     }
 
     if (!title) {
@@ -308,27 +310,25 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
 }
 
 /**
- * @param {string} feedURL
+ * @param {import("./db.mjs").Feed} feed
+ * @param {boolean} [shouldForceRefresh=false] If true, the feed will be refreshed regardless of the last refresh time
  */
-export async function refreshArticlesForFeed(feedURL) {
-  const feedEtagData =
-    (await db.etags.where("url").equals(feedURL).first()) ?? null;
-
-  let headers;
-  if (feedEtagData) {
-    if (feedEtagData.etag) {
-      headers = {
-        "If-None-Match": feedEtagData.etag,
-      };
-    } else if (feedEtagData.lastModified) {
-      // Some hosts which don't support etags may still support If-Modified-Since
-      headers = {
-        "If-Modified-Since": feedEtagData.lastModified,
-      };
+export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
+  if (!shouldForceRefresh) {
+    const refreshInterval = await settings.get("articleRefreshInterval");
+    const lastRefreshedAt = feed.lastRefreshedAt ?? 0;
+    // If less time has elapsed since last refresh than the refresh interval, don't refresh
+    if (Date.now() - lastRefreshedAt > refreshInterval) {
+      return;
     }
   }
 
-  const feedResponse = await proxiedFetch(feedURL, {
+  const headers = new Headers({
+    "If-None-Match": feed.etag,
+    "If-Modified-Since": feed.lastModified,
+  });
+
+  const feedResponse = await proxiedFetch(feed.url, {
     method: "GET",
     headers,
   });
@@ -340,38 +340,32 @@ export async function refreshArticlesForFeed(feedURL) {
 
   if (!feedResponse.ok) {
     throw new Error(
-      `Unable to refresh feed articles: received ${feedResponse.status} ${feedResponse.statusText} response from feed URL ${feedURL}`
+      `Unable to refresh feed articles: received ${feedResponse.status} ${feedResponse.statusText} response from feed URL ${feed.url}`
     );
   }
 
-  const newEtag = feedResponse.headers.get("Etag");
-  if (newEtag) {
-    db.etags.put({ url: feedURL, etag: newEtag });
-  } else {
-    const lastModified =
-      feedResponse.headers.get("Last-Modified") ||
-      // Fall back to the current date if the response doesn't provide a last modified header
-      // Last-Modified dates are always in UTC
-      new Date().toUTCString();
-    db.etags.put({ url: feedURL, lastModified });
-  }
+  db.feeds.update(feed.url, {
+    etag: feedResponse.headers.get("Etag"),
+    lastModified: feedResponse.headers.get("Last-Modified"),
+    lastRefreshedAt: Date.now(),
+  });
 
   const feedText = await feedResponse.text();
 
   switch (feedResponse.headers.get("content-type")) {
     case "application/atom+xml":
       return processAtomFeedResponse(
-        feedURL,
+        feed.url,
         domParser.parseFromString(feedText, "application/xml")
       );
     case "application/rss+xml":
       return processRSSFeedResponse(
-        feedURL,
+        feed.url,
         domParser.parseFromString(feedText, "application/xml")
       );
     case "application/feed+json":
     case "application/json":
-      return processJSONFeedResponse(feedURL, JSON.parse(feedText));
+      return processJSONFeedResponse(feed.url, JSON.parse(feedText));
   }
 
   // If we're at this point, we've received an unrecognized content type. Let's see if we can figure it out.
@@ -386,7 +380,7 @@ export async function refreshArticlesForFeed(feedURL) {
     }
 
     if (feedJSON) {
-      return processJSONFeedResponse(feedURL, feedJSON);
+      return processJSONFeedResponse(feed.url, feedJSON);
     }
   }
 
@@ -397,12 +391,12 @@ export async function refreshArticlesForFeed(feedURL) {
     rootElement.tagName === "feed" &&
     rootElement.namespaceURI === "http://www.w3.org/2005/Atom"
   ) {
-    return processAtomFeedResponse(feedURL, feedDocument);
+    return processAtomFeedResponse(feed.url, feedDocument);
   } else if (rootElement.tagName === "rss") {
-    return processRSSFeedResponse(feedURL, feedDocument);
+    return processRSSFeedResponse(feed.url, feedDocument);
   } else {
     throw new Error(
-      `Received unrecognized XML feed format for feed URL ${feedURL}`
+      `Received unrecognized XML feed format for feed URL ${feed.url}`
     );
   }
 }
@@ -410,21 +404,19 @@ export async function refreshArticlesForFeed(feedURL) {
 export async function refreshAllArticles() {
   await refreshFeeds();
 
-  const feedURLs = await db.feeds.toCollection().primaryKeys();
+   const feeds = await db.feeds.toArray();
 
   const results = await Promise.allSettled(
-    feedURLs.map((feedURL) => refreshArticlesForFeed(feedURL))
+    feeds.map((feed) => refreshArticlesForFeed(feed))
   );
 
   for (let i = 0, numResults = results.length; i < numResults; ++i) {
     const result = results[i];
     if (result.status === "rejected") {
       console.error(
-        `Failed to refresh articles for feed ${feedURLs[i]}:`,
+        `Failed to refresh articles for feed ${feeds[i]}:`,
         result.reason
       );
     }
   }
-
-  window.addEventListener("reader:articles-updated", refreshAllArticles);
 }

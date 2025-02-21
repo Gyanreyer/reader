@@ -6,17 +6,10 @@ import { Dexie } from "/lib/dexie.mjs";
 /**
  * @typedef {{
  *  url: string;
- * } & ({
- *  etag?: null; lastModified: string;
- * } | {
- *  etag: string; lastModified?: null;
- * })} ETagData
- */
-
-/**
- * @typedef {{
- *  url: string;
  *  title: string;
+ *  lastRefreshedAt: number | null;
+ *  etag?: string | null;
+ *  lastModified?: string | null;
  * }} Feed
  */
 
@@ -35,16 +28,23 @@ import { Dexie } from "/lib/dexie.mjs";
  */
 
 /**
+ * @typedef {{
+ *  name: string;
+ *  value: unknown;
+ * }} Setting
+ */
+
+/**
  * @type {TDexie & {
- *   etags: Table<ETagData, ETagData["url"]>;
  *   feeds: Table<Feed, Feed["url"]>;
  *   articles: Table<Article, Article["url"]>
+ *   settings: Table<Setting, Setting["name"]>
  * }}
  */
 export const db = /** @type {any} */ (new Dexie("FeedsDatabase"));
 
-db.version(1).stores({
-  etags: "url",
+db.version(1.1).stores({
   feeds: "url, title",
   articles: "url, feedURL, title, publishedAt, readAt",
+  settings: "name",
 });

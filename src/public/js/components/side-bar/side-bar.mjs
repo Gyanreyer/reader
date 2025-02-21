@@ -1,4 +1,4 @@
-import { css, html, LitElement } from "/lib/lit-core.mjs";
+import { css, html, LitElement } from "/lib/lit.mjs";
 
 export class SideBar extends LitElement {
   static properties = {
