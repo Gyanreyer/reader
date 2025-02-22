@@ -1,8 +1,9 @@
 import { css, html, LitElement, repeat } from "/lib/lit.mjs";
+
 import { db } from "/js/db.mjs";
+import { refreshAllArticles } from "/js/refreshArticles.mjs";
 
 import "./article-list-item.mjs";
-import { refreshAllArticles } from "/js/refreshArticles.mjs";
 
 export class ArticlesList extends LitElement {
   static PAGE_SIZE = 48;
@@ -35,22 +36,18 @@ export class ArticlesList extends LitElement {
     this._totalArticleCount = 0;
 
     /**
-     * @type {string[]}
+     * Tracks whether the articles list is stale and should be updated.
+     * This is set to true whenever the list of feeds or articles is updated.
+     * @type {boolean}
      */
-    this._feedURLs = [];
+    this._areArticlesStale = true;
 
-    this._onFeedsUpdated = async () => {
-      this._feedURLs = await db.feeds.toCollection().primaryKeys();
-      await this._hydrateArticlesList();
+    this._onArticlesUpdated = () => {
+      this._areArticlesStale = true;
+      this._updateArticlesList();
     };
-    window.addEventListener("reader:feeds-updated", this._onFeedsUpdated);
-
-    this._onArticlesUpdated = async () => {
-      this._hydrateArticlesList();
-    };
+    window.addEventListener("reader:feeds-updated", this._onArticlesUpdated);
     window.addEventListener("reader:articles-updated", this._onArticlesUpdated);
-
-    this._onFeedsUpdated();
 
     refreshAllArticles();
   }
@@ -58,22 +55,25 @@ export class ArticlesList extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
 
-    window.removeEventListener("reader:feeds-updated", this._onFeedsUpdated);
+    window.removeEventListener("reader:feeds-updated", this._onArticlesUpdated);
     window.removeEventListener(
       "reader:articles-updated",
       this._onArticlesUpdated
     );
   }
 
-  async _hydrateArticlesList() {
+  async _updateArticlesList() {
+    this._areArticlesStale = false;
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
     const searchParams = new URLSearchParams(window.location.search);
     const filterFeedURL = searchParams.get("filter-feed-url");
 
-    const feedSet = filterFeedURL
-      ? new Set([filterFeedURL])
-      : new Set(this._feedURLs);
+    const feedURLs = filterFeedURL
+      ? [filterFeedURL]
+      : await db.feeds.toCollection().primaryKeys();
+
+    const feedSet = new Set(feedURLs);
 
     // It's surprisingly faster to just get the full list of articles and filter/paginate them in memory. Hmm.
     const allArticleURLs = await db.articles
@@ -96,6 +96,10 @@ export class ArticlesList extends LitElement {
       pageStartIndex + ArticlesList.PAGE_SIZE
     );
     this._totalArticleCount = allArticleURLs.length;
+
+    if (this._areArticlesStale) {
+      return this._updateArticlesList();
+    }
   }
 
   render() {

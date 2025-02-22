@@ -43,7 +43,7 @@ async function updateSavedArticles(parsedArticles) {
       )
     );
   });
-  window.dispatchEvent(new Event("reader:articles-updated"));
+  window.dispatchEvent(new CustomEvent("reader:articles-updated"));
 }
 
 /**
@@ -119,10 +119,12 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
     parsedArticles[item.url] = {
       url: item.url,
       title,
-      thumbnail: {
-        url: thumbnailURL,
-        alt: "",
-      },
+      thumbnail: thumbnailURL
+        ? {
+            url: thumbnailURL,
+            alt: "",
+          }
+        : null,
       publishedAt: dateTimestamp ? new Date(dateTimestamp.trim()).getTime() : 0,
       feedURL,
       readAt: null,
@@ -208,10 +210,12 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
     parsedArticles[articleURL] = {
       url: articleURL,
       title,
-      thumbnail: {
-        url: thumbnailURL,
-        alt: "",
-      },
+      thumbnail: thumbnailURL
+        ? {
+            url: thumbnailURL,
+            alt: "",
+          }
+        : null,
       publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
       readAt: null,
       feedURL,
@@ -296,10 +300,12 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
     parsedArticles[articleURL] = {
       url: articleURL,
       title,
-      thumbnail: {
-        url: thumbnailURL,
-        alt: "",
-      },
+      thumbnail: thumbnailURL
+        ? {
+            url: thumbnailURL,
+            alt: "",
+          }
+        : null,
       publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
       feedURL,
       readAt: null,
@@ -318,7 +324,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     const refreshInterval = await settings.get("articleRefreshInterval");
     const lastRefreshedAt = feed.lastRefreshedAt ?? 0;
     // If less time has elapsed since last refresh than the refresh interval, don't refresh
-    if (Date.now() - lastRefreshedAt > refreshInterval) {
+    if (Date.now() - lastRefreshedAt <= refreshInterval) {
       return;
     }
   }
@@ -404,7 +410,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
 export async function refreshAllArticles() {
   await refreshFeeds();
 
-   const feeds = await db.feeds.toArray();
+  const feeds = await db.feeds.toArray();
 
   const results = await Promise.allSettled(
     feeds.map((feed) => refreshArticlesForFeed(feed))
