@@ -44,12 +44,19 @@ export class ArticleListItem extends LitElement {
       opacity: 0.7;
     }
 
-    article img {
-      max-width: min(100%, 420px);
+    #thumbnail-wrapper {
+      display: flex;
+      justify-content: start;
+      align-items: center;
       aspect-ratio: 16/9;
-      border-radius: 4px;
-      object-fit: cover;
+      max-width: min(100%, 420px);
       margin-block-end: 0.25rem;
+    }
+
+    #thumbnail {
+      border-radius: 4px;
+      max-width: 100%;
+      max-height: 100%;
     }
 
     article h2 {
@@ -151,13 +158,13 @@ export class ArticleListItem extends LitElement {
   _onClickArticleLink() {
     // Mark the article as read
     db.articles.update(this._article.url, {
-      readAt: Date.now(),
+      read: 1,
     });
   }
 
   _onClickToggleRead() {
     db.articles.update(this._article.url, {
-      readAt: this._article.readAt ? null : Date.now(),
+      read: /** @type {0 | 1} */ (this._article.read ^ 1),
     });
   }
 
@@ -184,16 +191,19 @@ export class ArticleListItem extends LitElement {
       return;
     }
 
-    const { url, title, thumbnail, publishedAt, readAt } = this._article;
+    const { url, title, thumbnail, publishedAt, read } = this._article;
 
-    return html`<article data-read="${readAt !== null}">
+    return html`<article data-read="${read === 1}">
       ${thumbnail && thumbnail !== NO_THUMBNAIL
-        ? html`<img
-            src="${thumbnail.url}"
-            alt="${thumbnail.alt}"
-            loading="lazy"
-            onerror="this.style.display = 'none'"
-          />`
+        ? html`<div id="thumbnail-wrapper">
+            <img
+              id="thumbnail"
+              src="${thumbnail.url}"
+              alt="${thumbnail.alt}"
+              loading="lazy"
+              onerror="this.parentElement.style.display = 'none'"
+            />
+          </div>`
         : null}
       <h2>
         <a href="${url}" target="_blank" @click="${this._onClickArticleLink}"
@@ -202,14 +212,14 @@ export class ArticleListItem extends LitElement {
       </h2>
       <p>${this._feedTitle}</p>
       <p>${new Date(publishedAt).toLocaleString()}</p>
-      <button popovertarget="menu-popover">
+      <button aria-label="Actions" popovertarget="menu-popover">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
           <use href="/spritesheet.svg#menu-dots"></use>
         </svg>
       </button>
       <div popover id="menu-popover">
         <button @click=${this._onClickToggleRead} id="toggle-read">
-          Mark as ${readAt ? "unread" : "read"}
+          Mark as ${read === 1 ? "unread" : "read"}
         </button>
       </div>
     </article>`;

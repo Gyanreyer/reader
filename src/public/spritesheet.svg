@@ -11,5 +11,8 @@
     <symbol id="hamburger-menu" viewBox="0 -960 960 960" fill="currentColor">
       <path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/>
     </symbol>
+    <symbol id="filter-icon" viewBox="0 -960 960 960" fill="currentColor">
+      <path d="M400-240v-80h160v80H400ZM240-440v-80h480v80H240ZM120-640v-80h720v80H120Z"/>
+    </symbol>
   </defs>
 </svg>

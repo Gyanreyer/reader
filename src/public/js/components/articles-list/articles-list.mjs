@@ -1,7 +1,9 @@
 import { css, html, LitElement, repeat } from "/lib/lit.mjs";
+import { Dexie, liveQuery } from "/lib/dexie.mjs";
 
 import { db } from "/js/db.mjs";
 import { refreshAllArticles } from "/js/refreshArticles.mjs";
+import { settings } from "/js/settings.mjs";
 
 import "./article-list-item.mjs";
 
@@ -11,6 +13,12 @@ export class ArticlesList extends LitElement {
   static get properties() {
     return {
       _articleURLs: {
+        state: true,
+      },
+      _filter_IncludeUnread: {
+        state: true,
+      },
+      _filter_IncludeRead: {
         state: true,
       },
     };
@@ -23,6 +31,13 @@ export class ArticlesList extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+    }
+
+    #filters-button {
+      position: fixed;
+      inset-block-start: 1rem;
+      inset-inline-end: 1rem;
+      z-index: 1;
     }
   `;
 
@@ -49,7 +64,26 @@ export class ArticlesList extends LitElement {
     window.addEventListener("reader:feeds-updated", this._onArticlesUpdated);
     window.addEventListener("reader:articles-updated", this._onArticlesUpdated);
 
+    this._updateArticlesList();
     refreshAllArticles();
+
+    /**
+     * @type {boolean | null}
+     */
+    this._filter_IncludeUnread = null;
+    /**
+     * @type {boolean | null}
+     */
+    this._filter_IncludeRead = null;
+
+    this._settingsSubscription = liveQuery(async () => ({
+      filter_IncludeUnread: await settings.get("filter_IncludeUnread"),
+      filter_IncludeRead: await settings.get("filter_IncludeRead"),
+    })).subscribe(({ filter_IncludeUnread, filter_IncludeRead }) => {
+      this._filter_IncludeUnread = filter_IncludeUnread;
+      this._filter_IncludeRead = filter_IncludeRead;
+      this._updateArticlesList();
+    });
   }
 
   disconnectedCallback() {
@@ -60,42 +94,60 @@ export class ArticlesList extends LitElement {
       "reader:articles-updated",
       this._onArticlesUpdated
     );
+
+    this._settingsSubscription.unsubscribe();
   }
 
   async _updateArticlesList() {
     this._areArticlesStale = false;
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
     const searchParams = new URLSearchParams(window.location.search);
     const filterFeedURL = searchParams.get("filter-feed-url");
-
-    const feedURLs = filterFeedURL
-      ? [filterFeedURL]
-      : await db.feeds.toCollection().primaryKeys();
-
-    const feedSet = new Set(feedURLs);
-
-    // It's surprisingly faster to just get the full list of articles and filter/paginate them in memory. Hmm.
-    const allArticleURLs = await db.articles
-      .orderBy("publishedAt")
-      .reverse()
-      .and(
-        (article) =>
-          (feedSet.has(article.feedURL) && article.readAt === null) ||
-          article.readAt === undefined ||
-          article.readAt > fiveMinutesAgo
-      )
-      .primaryKeys();
 
     const currentPage = Number(searchParams.get("page")) || 1;
 
     const pageStartIndex = (currentPage - 1) * ArticlesList.PAGE_SIZE;
 
-    this._articleURLs = allArticleURLs.slice(
-      pageStartIndex,
-      pageStartIndex + ArticlesList.PAGE_SIZE
-    );
-    this._totalArticleCount = allArticleURLs.length;
+    let articlesCollection;
+
+    this._filter_IncludeRead ??= await settings.get("filter_IncludeRead");
+    this._filter_IncludeUnread ??= await settings.get("filter_IncludeUnread");
+
+    if (filterFeedURL) {
+      if (this._filter_IncludeRead && this._filter_IncludeUnread) {
+        articlesCollection = db.articles
+          .where(["feedURL", "publishedAt"])
+          .between(
+            [filterFeedURL, Dexie.minKey],
+            [filterFeedURL, Dexie.maxKey]
+          );
+      } else {
+        articlesCollection = db.articles
+          .where(["feedURL", "read", "publishedAt"])
+          .between(
+            [filterFeedURL, this._filter_IncludeUnread ? 0 : 1, Dexie.minKey],
+            [filterFeedURL, this._filter_IncludeRead ? 1 : 0, Dexie.maxKey]
+          );
+      }
+    } else {
+      if (this._filter_IncludeRead && this._filter_IncludeUnread) {
+        articlesCollection = db.articles.orderBy("publishedAt");
+      } else {
+        articlesCollection = db.articles
+          .where(["read", "publishedAt"])
+          .between(
+            [this._filter_IncludeUnread ? 0 : 1, Dexie.minKey],
+            [this._filter_IncludeRead ? 1 : 0, Dexie.maxKey]
+          );
+      }
+    }
+
+    this._totalArticleCount = await articlesCollection.count();
+    this._articleURLs = await articlesCollection
+      .reverse()
+      .offset(pageStartIndex)
+      .limit(ArticlesList.PAGE_SIZE)
+      .primaryKeys();
 
     if (this._areArticlesStale) {
       return this._updateArticlesList();
@@ -118,6 +170,44 @@ export class ArticlesList extends LitElement {
       this._totalArticleCount > currentPageNumber * ArticlesList.PAGE_SIZE;
 
     return html`
+      <button
+        aria-label="Filter settings"
+        popovertarget="filters-popover"
+        id="filters-button"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+          <use href="/spritesheet.svg#filter-icon"></use>
+        </svg>
+      </button>
+      <div popover id="filters-popover">
+        <label>
+          Include unread
+          <input
+            type="checkbox"
+            id="filter-include-unread"
+            ?checked="${settings.get("filter_IncludeUnread")}"
+            @change="${async (event) => {
+              await settings.set("filter_IncludeUnread", event.target.checked);
+            }}"
+          />
+        </label>
+        ${this._filter_IncludeRead !== null
+          ? html`<label>
+              Include read
+              <input
+                type="checkbox"
+                id="filter-include-read"
+                ?checked="${this._filter_IncludeRead}"
+                @change="${async (event) => {
+                  await settings.set(
+                    "filter_IncludeRead",
+                    event.target.checked
+                  );
+                }}"
+              />
+            </label>`
+          : null}
+      </div>
       <ul>
         ${repeat(
           this._articleURLs,

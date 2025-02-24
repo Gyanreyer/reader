@@ -127,7 +127,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
         : null,
       publishedAt: dateTimestamp ? new Date(dateTimestamp.trim()).getTime() : 0,
       feedURL,
-      readAt: null,
+      read: 0,
     };
   }
 
@@ -217,7 +217,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
           }
         : null,
       publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
-      readAt: null,
+      read: 0,
       feedURL,
     };
   }
@@ -308,7 +308,7 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
         : null,
       publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
       feedURL,
-      readAt: null,
+      read: 0,
     };
   }
 
@@ -341,10 +341,16 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
 
   if (feedResponse.status === 304) {
     // The feed is unchanged, no need to update the database
+    db.feeds.update(feed.url, {
+      lastRefreshedAt: Date.now(),
+    });
     return;
   }
 
   if (!feedResponse.ok) {
+    db.feeds.update(feed.url, {
+      lastRefreshedAt: Date.now(),
+    });
     throw new Error(
       `Unable to refresh feed articles: received ${feedResponse.status} ${feedResponse.statusText} response from feed URL ${feed.url}`
     );

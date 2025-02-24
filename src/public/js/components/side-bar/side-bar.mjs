@@ -29,8 +29,8 @@ export class SideBar extends LitElement {
 
     #toggle-menu-button {
       position: absolute;
-      top: 1rem;
-      left: calc(100% + 1rem);
+      inset-block-start: 1rem;
+      inset-inline-start: calc(100% + 1rem);
       visibility: visible;
       transition: transform 0.2s;
     }

@@ -1,14 +1,13 @@
 // 11ty plugins
 import pluginWebc from "@11ty/eleventy-plugin-webc";
 // import bundlerPlugin from "@11ty/eleventy-plugin-bundle";
-import litPlugin from "@lit-labs/eleventy-plugin-lit";
 
 // Minification/asset processing libs
-import esbuild from "esbuild";
-import { minify as minifyCSS } from "csso";
-import { minify as minifyHTML } from "html-minifier-terser";
+// import esbuild from "esbuild";
+// import { minify as minifyCSS } from "csso";
+// import { minify as minifyHTML } from "html-minifier-terser";
 
-const IS_PRODUCTION = process.env.NODE_ENV === "prod";
+// const IS_PRODUCTION = process.env.NODE_ENV === "prod";
 
 /**
  * @param {import("@11ty/eleventy").UserConfig} eleventyConfig

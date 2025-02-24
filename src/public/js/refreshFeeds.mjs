@@ -1,6 +1,6 @@
 import { db } from "./db.mjs";
 
-const FEEDS_URL = new URL("/feeds.opml", window.location.origin).toString();
+const FEEDS_URL = new URL("/feeds.json", window.location.origin).toString();
 
 const FEEDS_ETAG_LOCALSTORAGE_KEY = "feedsEtag";
 
@@ -34,52 +34,61 @@ export async function refreshFeeds() {
     feedsResponse.headers.get("Etag")
   );
 
-  const parser = new DOMParser();
-  const feedsDocument = parser.parseFromString(
-    await feedsResponse.text(),
-    "application/xml"
-  );
-
-  // Each <outline> tag has the following attributes:
-  // text: the title of the feed
-  // title: (optional) the title of the feed; use if text is not present
-  // type: "rss"
-  // xmlUrl: the URL of the feed
-  const feedOutlineTags = feedsDocument.querySelectorAll("outline[type=rss]");
-
   /**
    * @type {{
-   *  [feedURL: string]: import("./db.mjs").Feed;
-   * }}
+   *  name: string;
+   *  url: string;
+   * }[]}
    */
-  const updatedFeedData = {};
-  for (const feedOutlineTag of feedOutlineTags) {
-    const feedURL = feedOutlineTag.getAttribute("xmlUrl");
-    const feedTitle =
-      feedOutlineTag.getAttribute("title") ||
-      feedOutlineTag.getAttribute("text") ||
-      feedURL;
+  const feeds = await feedsResponse.json();
 
-    if (!URL.canParse(feedURL)) {
-      console.error("Encountered invalid feed URL:", feedURL);
-      continue;
-    }
-
-    updatedFeedData[feedURL] = {
-      url: feedURL,
-      title: feedTitle,
-      lastRefreshedAt: 0,
-    };
+  /**
+   * @type {Map<string, { title: string; url: string }>}
+   */
+  const allFeedsMap = new Map();
+  for (const feed of feeds) {
+    allFeedsMap.set(feed.url, {
+      title: feed.name,
+      url: feed.url,
+    });
   }
 
-  const allUpdatedFeedURLs = Object.keys(updatedFeedData);
+  const newFeedURLsSet = new Set(allFeedsMap.keys());
 
-  await db.transaction("rw", db.feeds, () => {
+  await db.transaction("rw", db.feeds, db.articles, async () => {
+    const existingFeedURLs = await db.feeds.toCollection().primaryKeys();
+    const feedURLsToDelete = [];
+    const feedURLsToUpdate = [];
+
+    for (const feedURL of existingFeedURLs) {
+      if (allFeedsMap.has(feedURL)) {
+        feedURLsToUpdate.push(feedURL);
+      } else {
+        feedURLsToDelete.push(feedURL);
+      }
+      newFeedURLsSet.delete(feedURL);
+    }
+
+    const feedURLsToAdd = Array.from(newFeedURLsSet);
+
     // Write all updated feeds to the DB
     return Promise.all([
-      db.feeds.bulkPut(Object.values(updatedFeedData)),
-      // Delete feeds that are have been removed
-      db.feeds.where("url").noneOf(allUpdatedFeedURLs).delete(),
+      db.feeds.bulkUpdate(
+        feedURLsToUpdate.map((url) => ({
+          key: url,
+          changes: allFeedsMap.get(url),
+        }))
+      ),
+      db.feeds.bulkPut(
+        feedURLsToAdd.map((url) => ({
+          ...allFeedsMap.get(url),
+          lastRefreshedAt: 0,
+        }))
+      ),
+      // Delete feeds that have been removed
+      db.feeds.where("url").anyOf(feedURLsToDelete).delete(),
+      // Delete articles for feeds that have been removed
+      db.articles.where("feedURL").anyOf(feedURLsToDelete).delete(),
     ]);
   });
 

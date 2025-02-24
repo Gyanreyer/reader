@@ -63,7 +63,7 @@
     <outline text="That HTML Blog" type="rss" xmlUrl="https://thathtml.blog/feed.xml"/>
     <outline text="The 11ty Bundle | Home" type="rss" xmlUrl="https://11tybundle.dev/feed.xml"/>
     <outline text="The A11Y Project" type="rss" xmlUrl="https://buttondown.email/the-a11y-project/rss"/>
-    <outline text=" The Cascade" type="rss" xmlUrl="https://csscade.com/feed.xml"/>
+    <outline text="The Cascade" type="rss" xmlUrl="https://csscade.com/feed.xml"/>
     <outline text="The Roof is on Phire" type="rss" xmlUrl="https://phirephoenix.com/feed.xml"/>
     <outline text="Tink - Léonie Watson - On technology, food &amp; life in the digital age" type="rss" xmlUrl="https://tink.uk/feed.xml"/>
     <outline text="Trys Mudford&apos;s Blog" type="rss" xmlUrl="https://www.trysmudford.com/blog/index.xml"/>
@@ -90,5 +90,6 @@
     <outline text="Max Levchin: too long to tweet" type="rss" xmlUrl="https://max.levch.in/rss"/>
     <outline text="Sidebar" type="rss" xmlUrl="https://sidebar.io/feed.xml"/>
     <outline text="Kyrylo Silin" type="rss" xmlUrl="https://kyrylo.org/feed.xml"/>
+    <outline text="Motor City Hoops" type="rss" xmlUrl="https://motorcityhoops.substack.com/feed"/>
   </body>
 </opml>
