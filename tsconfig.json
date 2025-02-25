@@ -10,5 +10,5 @@
     "module": "NodeNext",
     "moduleResolution": "nodenext"
   },
-  "include": ["src/public/**/*.mjs", "src/public/**/*.d.ts"]
+  "include": ["src/public/**/*.js", "src/public/**/*.d.ts"]
 }

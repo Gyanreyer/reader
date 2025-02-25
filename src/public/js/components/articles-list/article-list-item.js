@@ -1,10 +1,10 @@
-import { css, html, LitElement } from "/lib/lit.mjs";
-import { liveQuery } from "/lib/dexie.mjs";
-import { db } from "/js/db.mjs";
-import { getMetadataForURL } from "../../getMetadataForURL.mjs";
+import { css, html, LitElement } from "/lib/lit.js";
+import { liveQuery } from "/lib/dexie.js";
+import { db } from "/js/db.js";
+import { getMetadataForURL } from "../../getMetadataForURL.js";
 
 /**
- * @import { Article } from '/js/db.mjs';
+ * @import { Article } from '/js/db.js';
  */
 
 const NO_THUMBNAIL = "NO_THUMBNAIL";

@@ -1,0 +1,13 @@
+{
+  "files": ["lit-bundle-entrypoint.js"],
+  "compilerOptions": {
+    "checkJs": true,
+    "allowJs": true,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "outFile": "../../src/public/lib/lit.d.ts"
+  }
+}

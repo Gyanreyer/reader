@@ -1,8 +1,8 @@
-import { css, html, LitElement } from "/lib/lit.mjs";
-import { db } from "/js/db.mjs";
+import { css, html, LitElement } from "/lib/lit.js";
+import { db } from "/js/db.js";
 
 /**
- * @import { Feed } from '/js/db.mjs';
+ * @import { Feed } from '/js/db.js';
  */
 
 export class FeedsList extends LitElement {

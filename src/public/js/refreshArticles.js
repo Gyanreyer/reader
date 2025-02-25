@@ -1,11 +1,11 @@
-import { db } from "./db.mjs";
-import { refreshFeeds } from "./refreshFeeds.mjs";
-import { settings } from "./settings.mjs";
-import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.mjs";
-import { proxiedFetch } from "./utils/proxiedFetch.mjs";
+import { db } from "./db.js";
+import { refreshFeeds } from "./refreshFeeds.js";
+import { settings } from "./settings.js";
+import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.js";
+import { proxiedFetch } from "./utils/proxiedFetch.js";
 
 /**
- * @import { Article } from './db.mjs';
+ * @import { Article } from './db.js';
  */
 
 const domParser = new DOMParser();
@@ -43,7 +43,6 @@ async function updateSavedArticles(parsedArticles) {
       )
     );
   });
-  window.dispatchEvent(new CustomEvent("reader:articles-updated"));
 }
 
 /**
@@ -59,7 +58,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
   }
 
   /**
-   * @type {Record<string, import("./db.mjs").Article>} Parsed articles to add to the database
+   * @type {Record<string, import("./db.js").Article>} Parsed articles to add to the database
    */
   const parsedArticles = {};
 
@@ -316,7 +315,7 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
 }
 
 /**
- * @param {import("./db.mjs").Feed} feed
+ * @param {import("./db.js").Feed} feed
  * @param {boolean} [shouldForceRefresh=false] If true, the feed will be refreshed regardless of the last refresh time
  */
 export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
@@ -418,8 +417,25 @@ export async function refreshAllArticles() {
 
   const feeds = await db.feeds.toArray();
 
+  window.dispatchEvent(
+    new CustomEvent("reader:articles-refresh-started", {
+      detail: {
+        feedCount: feeds.length,
+      },
+    })
+  );
+
   const results = await Promise.allSettled(
-    feeds.map((feed) => refreshArticlesForFeed(feed))
+    feeds.map(async (feed) => {
+      await refreshArticlesForFeed(feed);
+      window.dispatchEvent(
+        new CustomEvent("reader:articles-refreshed-feed", {
+          detail: {
+            feedURL: feed.url,
+          },
+        })
+      );
+    })
   );
 
   for (let i = 0, numResults = results.length; i < numResults; ++i) {
@@ -431,4 +447,5 @@ export async function refreshAllArticles() {
       );
     }
   }
+  window.dispatchEvent(new CustomEvent("reader:all-articles-refreshed"));
 }

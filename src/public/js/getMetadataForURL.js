@@ -1,4 +1,4 @@
-import { proxiedFetch } from "./utils/proxiedFetch.mjs";
+import { proxiedFetch } from "./utils/proxiedFetch.js";
 
 const domParser = new DOMParser();
 

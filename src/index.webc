@@ -51,10 +51,9 @@ description: "Ryan's RSS Feed Reader"
     padding-block: 1rem 4rem;
     padding-inline: 1rem;
   }
-
 </style>
 <script
-  src="/js/entrypoints/index.mjs"
+  src="/js/entrypoints/index.js"
   webc:keep
   type="module"
   crossorigin="anonymous"

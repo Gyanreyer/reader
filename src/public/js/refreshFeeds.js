@@ -1,4 +1,4 @@
-import { db } from "./db.mjs";
+import { db } from "./db.js";
 
 const FEEDS_URL = new URL("/feeds.json", window.location.origin).toString();
 

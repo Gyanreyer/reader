@@ -1,6 +1,6 @@
-import { Dexie } from "/lib/dexie.mjs";
+import { Dexie } from "/lib/dexie.js";
 /**
- * @import { Dexie as TDexie, Table } from "/lib/dexie.d.ts";
+ * @import { Dexie as TDexie, Table } from "dexie";
  */
 
 /**

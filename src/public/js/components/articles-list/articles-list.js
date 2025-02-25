@@ -1,11 +1,11 @@
-import { css, html, LitElement, repeat } from "/lib/lit.mjs";
-import { Dexie, liveQuery } from "/lib/dexie.mjs";
+import { css, html, LitElement, repeat } from "/lib/lit.js";
+import { Dexie, liveQuery } from "/lib/dexie.js";
 
-import { db } from "/js/db.mjs";
-import { refreshAllArticles } from "/js/refreshArticles.mjs";
-import { settings } from "/js/settings.mjs";
+import { db } from "/js/db.js";
+import { refreshAllArticles } from "/js/refreshArticles.js";
+import { settings } from "/js/settings.js";
 
-import "./article-list-item.mjs";
+import "./article-list-item.js";
 
 export class ArticlesList extends LitElement {
   static PAGE_SIZE = 48;
@@ -62,7 +62,10 @@ export class ArticlesList extends LitElement {
       this._updateArticlesList();
     };
     window.addEventListener("reader:feeds-updated", this._onArticlesUpdated);
-    window.addEventListener("reader:articles-updated", this._onArticlesUpdated);
+    window.addEventListener(
+      "reader:all-articles-refreshed",
+      this._onArticlesUpdated
+    );
 
     this._updateArticlesList();
     refreshAllArticles();
