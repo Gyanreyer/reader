@@ -44,19 +44,11 @@ export class ArticleListItem extends LitElement {
       opacity: 0.7;
     }
 
-    #thumbnail-wrapper {
-      display: flex;
-      justify-content: start;
-      align-items: center;
-      aspect-ratio: 16/9;
+    #thumbnail {
+      display: block;
       max-width: min(100%, 420px);
       margin-block-end: 0.25rem;
-    }
-
-    #thumbnail {
       border-radius: 4px;
-      max-width: 100%;
-      max-height: 100%;
     }
 
     article h2 {
@@ -195,15 +187,13 @@ export class ArticleListItem extends LitElement {
 
     return html`<article data-read="${read === 1}">
       ${thumbnail && thumbnail !== NO_THUMBNAIL
-        ? html`<div id="thumbnail-wrapper">
-            <img
-              id="thumbnail"
-              src="${thumbnail.url}"
-              alt="${thumbnail.alt}"
-              loading="lazy"
-              onerror="this.parentElement.style.display = 'none'"
-            />
-          </div>`
+        ? html`<img
+            id="thumbnail"
+            src="${thumbnail.url}"
+            alt="${thumbnail.alt}"
+            loading="lazy"
+            onerror="this.parentElement.style.display = 'none'"
+          />`
         : null}
       <h2>
         <a href="${url}" target="_blank" @click="${this._onClickArticleLink}"
