@@ -1,7 +1,6 @@
 import { db } from "./db.js";
 import { refreshFeeds } from "./refreshFeeds.js";
 import { settings } from "./settings.js";
-import { getTitleSnippetFromContentText } from "./utils/getTitleSnippetFromContentText.js";
 import { proxiedFetch } from "./utils/proxiedFetch.js";
 
 /**
@@ -9,9 +8,6 @@ import { proxiedFetch } from "./utils/proxiedFetch.js";
  */
 
 const domParser = new DOMParser();
-
-const sanitizeXMLTitle = (title) =>
-  domParser.parseFromString(title, "text/html").body.textContent.trim();
 
 /**
  * @param {{
@@ -45,6 +41,108 @@ async function updateSavedArticles(parsedArticles) {
   });
 }
 
+const WHITE_SPACE_REGEX = /\s+/;
+
+/**
+ * @param {{
+ *  feedURL: string;
+ *  rawURL?: string | null;
+ *  rawTitle?: string | null;
+ *  rawContent?: string | null;
+ *  rawThumbnailURL?: string | null;
+ *  rawPublishedAtTimestamp?: string | null;
+ * }} data
+ *
+ * @returns {Article}
+ */
+const getFormattedArticleData = ({
+  feedURL,
+  rawURL = null,
+  rawTitle = null,
+  rawContent = null,
+  rawThumbnailURL = null,
+  rawPublishedAtTimestamp = null,
+}) => {
+  const url = rawURL?.trim();
+
+  if (!url || !URL.canParse(url)) {
+    throw new Error(`Received invalid article URL: ${url}`);
+  }
+
+  /**
+   * @type {string | null}
+   */
+  let title = null;
+  /**
+   * @type {string | null}
+   */
+  let thumbnailURL = null;
+  /**
+   * @type {number}
+   */
+  let publishedAt = 0;
+
+  /**
+   * @type {number | null}
+   */
+  let wordCount = null;
+
+  if (rawTitle) {
+    try {
+      // Titles may include HTML entities, so we need to parse them as HTML to get clean sanitized text content
+      const parsedTitle = (
+        domParser.parseFromString(rawTitle, "text/html").body.textContent ??
+        rawTitle
+      ).trim();
+      title = parsedTitle;
+    } catch (e) {
+      title = rawTitle.trim();
+      console.error(e);
+    }
+  }
+
+  if (rawThumbnailURL && URL.canParse(rawThumbnailURL)) {
+    thumbnailURL = rawThumbnailURL;
+  }
+
+  if (rawContent) {
+    const parsedContentDocument = domParser.parseFromString(
+      rawContent,
+      "text/html"
+    );
+    const contentText = parsedContentDocument.body.textContent?.trim() ?? "";
+
+    const words = contentText.split(WHITE_SPACE_REGEX);
+    wordCount = words.length;
+
+    if (!title) {
+      // Grab the first 10 words of the content text to use as a placeholder title
+      title = `${words.slice(0, 10).join(" ")}${
+        words.length > 10 ? "..." : ""
+      }`;
+    }
+  }
+
+  if (rawPublishedAtTimestamp) {
+    publishedAt = new Date(rawPublishedAtTimestamp.trim()).getTime();
+  }
+
+  return {
+    feedURL,
+    url,
+    title,
+    wordCount,
+    publishedAt,
+    thumbnail: thumbnailURL
+      ? {
+          url: thumbnailURL,
+          alt: "",
+        }
+      : null,
+    read: 0,
+  };
+};
+
 /**
  * @param {string} feedURL
  * @param {Record<string, any>} feedJSON
@@ -63,71 +161,34 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
   const parsedArticles = {};
 
   for (const item of items) {
-    if (typeof item.url !== "string" || !URL.canParse(item.url)) {
+    try {
+      const article = getFormattedArticleData({
+        feedURL,
+        rawURL: item.url,
+        rawPublishedAtTimestamp: item.date_published || item.date_modified,
+        rawTitle: item.title,
+        rawContent: item.content_html || item.content_text,
+        rawThumbnailURL:
+          item.image ||
+          item.banner_image ||
+          item.attachments?.find(
+            /**
+             * @param {{
+             *   mime_type?: string;
+             *   url?: string;
+             * }} attachment
+             */
+            (attachment) => attachment.mime_type?.startsWith("image")
+          )?.url,
+      });
+      parsedArticles[article.url] = article;
+    } catch (e) {
       console.error(
-        `Received JSON feed with invalid or missing "url" property for item in feed URL ${feedURL}`
+        "Failed to process JSON feed article data for item:",
+        JSON.stringify(item, null, 2),
+        e
       );
-      continue;
     }
-
-    /**
-     * @type {string | null}
-     */
-    let title = null;
-    if (typeof item.title === "string") {
-      title = item.title.trim();
-    } else if (item.content_text && typeof item.content_text === "string") {
-      const extractedTitleSnippet = getTitleSnippetFromContentText(
-        item.content_text
-      );
-      if (extractedTitleSnippet) {
-        title = extractedTitleSnippet;
-      }
-    } else if (item.content_html && typeof item.content_html === "string") {
-      const parsedContentDocument = domParser.parseFromString(
-        item.content_html,
-        "text/html"
-      );
-      const extractedTitleSnippet = getTitleSnippetFromContentText(
-        parsedContentDocument.body.textContent
-      );
-      if (extractedTitleSnippet) {
-        title = extractedTitleSnippet;
-      }
-    }
-
-    let dateTimestamp = item.date_published || item.date_modified;
-
-    /**
-     * @type {string | null}
-     */
-    let thumbnailURL = null;
-    if (item.image && URL.canParse(item.imge)) {
-      thumbnailURL = item.image.trim();
-    } else if (item.banner_image && URL.canParse(item.banner_image)) {
-      thumbnailURL = item.banner_image.trim();
-    } else if (item.attachments) {
-      const imageAttachment = item.attachments.find((attachment) =>
-        attachment.mime_type.startsWith("image")
-      );
-      if (imageAttachment && URL.canParse(imageAttachment.url)) {
-        thumbnailURL = imageAttachment.url.trim();
-      }
-    }
-
-    parsedArticles[item.url] = {
-      url: item.url,
-      title,
-      thumbnail: thumbnailURL
-        ? {
-            url: thumbnailURL,
-            alt: "",
-          }
-        : null,
-      publishedAt: dateTimestamp ? new Date(dateTimestamp.trim()).getTime() : 0,
-      feedURL,
-      read: 0,
-    };
   }
 
   await updateSavedArticles(parsedArticles);
@@ -140,85 +201,41 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
  * @param {Document} feedDocument
  */
 async function processRSSFeedResponse(feedURL, feedDocument) {
-  const items = Array.from(feedDocument.getElementsByTagName("item"));
-
   /**
    * @type {Record<string, Article>} Parsed articles to add to the database
    */
   const parsedArticles = {};
 
-  for (const item of items) {
-    const articleURL = item.querySelector("link")?.textContent.trim();
-    if (!articleURL || !URL.canParse(articleURL)) {
+  for (const item of feedDocument.getElementsByTagName("item")) {
+    try {
+      const article = getFormattedArticleData({
+        feedURL,
+        rawURL:
+          item.querySelector("link")?.textContent ||
+          // Attempt to recover from missing URLs by checking for a URL in a <guid> tag
+          item.querySelector("guid")?.textContent,
+        rawTitle: item.querySelector("title")?.textContent,
+        rawContent:
+          item.getElementsByTagName("content:encoded")?.[0]?.textContent ||
+          item.querySelector("description")?.textContent,
+        rawPublishedAtTimestamp:
+          item.querySelector("pubDate")?.textContent ||
+          item.getElementsByTagName("dc:date")?.[0]?.textContent,
+        rawThumbnailURL:
+          item
+            .getElementsByTagName("media:thumbnail")?.[0]
+            ?.getAttribute("url") ||
+          item.querySelector("enclosure[type^=image]")?.getAttribute("url"),
+      });
+
+      parsedArticles[article.url] = article;
+    } catch (e) {
       console.error(
-        `Item in RSS feed ${feedURL} has missing or invalid link URL`,
-        item.outerHTML
+        "Failed to process RSS feed article data for item:",
+        item.outerHTML,
+        e
       );
     }
-
-    /**
-     * @type {string | null}
-     */
-    let title = null;
-    const titleTagText = item.querySelector("title")?.textContent;
-    if (titleTagText) {
-      title = sanitizeXMLTitle(titleTagText);
-    } else {
-      const rawDescriptionText = item.querySelector("description")?.textContent;
-      if (rawDescriptionText) {
-        const parsedDescriptionDocument = domParser.parseFromString(
-          rawDescriptionText,
-          "text/html"
-        );
-        const extractedTitleSnippet = getTitleSnippetFromContentText(
-          parsedDescriptionDocument.body.textContent
-        );
-        if (extractedTitleSnippet) {
-          title = extractedTitleSnippet;
-        }
-      }
-    }
-
-    const dateTimestamp = (
-      item.querySelector("pubDate") || item.getElementsByTagName("dc:date")?.[0]
-    )?.textContent.trim();
-
-    /**
-     * @type {string | null}
-     */
-    let thumbnailURL = null;
-
-    const mediaThumbnailURL = item
-      .querySelector("media\\:thumbnail")
-      ?.getAttribute("url")
-      .trim();
-    if (mediaThumbnailURL && URL.canParse(mediaThumbnailURL)) {
-      thumbnailURL = mediaThumbnailURL;
-    } else {
-      const imageEnclosureURL = item
-        .querySelector("enclosure[type^='image']")
-        ?.getAttribute("url")
-        .trim();
-      if (imageEnclosureURL && URL.canParse(imageEnclosureURL)) {
-        thumbnailURL = imageEnclosureURL;
-      }
-    }
-
-    thumbnailURL = thumbnailURL ? thumbnailURL.trim() : null;
-
-    parsedArticles[articleURL] = {
-      url: articleURL,
-      title,
-      thumbnail: thumbnailURL
-        ? {
-            url: thumbnailURL,
-            alt: "",
-          }
-        : null,
-      publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
-      read: 0,
-      feedURL,
-    };
   }
 
   await updateSavedArticles(parsedArticles);
@@ -229,86 +246,38 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
  * @param {Document} feedDocument
  */
 async function processAtomFeedResponse(feedURL, feedDocument) {
-  const entries = feedDocument.getElementsByTagName("entry");
-
   /**
    * @type {Record<string, Article>} Parsed articles to add to the database
    */
   const parsedArticles = {};
 
-  for (const entry of entries) {
-    const articleURL = (
-      entry.querySelector("link")?.getAttribute("href") ||
-      // Try to recover from a missing link by checking for a URL in an <id>/<guid> tag;
-      // these are usually also the article URL
-      (entry.querySelector("id") || entry.querySelector("guid"))?.textContent
-    )?.trim();
-    if (!articleURL || !URL.canParse(articleURL)) {
+  for (const entry of feedDocument.getElementsByTagName("entry")) {
+    try {
+      const article = getFormattedArticleData({
+        feedURL,
+        rawURL:
+          entry.querySelector("link")?.getAttribute("href") ||
+          // Try to recover from a missing link by checking for a URL in an <id>/<guid> tag;
+          // these are usually also the article URL
+          (entry.querySelector("id") || entry.querySelector("guid"))
+            ?.textContent,
+        rawTitle: entry.querySelector("title")?.textContent,
+        rawContent: entry.querySelector("content")?.textContent,
+        rawPublishedAtTimestamp:
+          entry.querySelector("published")?.textContent ||
+          entry.querySelector("updated")?.textContent,
+        rawThumbnailURL: entry
+          .getElementsByTagName("media:thumbnail")?.[0]
+          ?.getAttribute("url"),
+      });
+      parsedArticles[article.url] = article;
+    } catch (e) {
       console.error(
-        `Entry in Atom feed ${feedURL} is missing a valid URL link`,
-        entry.outerHTML
-      );
-      continue;
-    }
-
-    let title = null;
-    const titleTag = entry.querySelector("title");
-    if (titleTag) {
-      title = sanitizeXMLTitle(titleTag.textContent);
-    }
-
-    if (!title) {
-      const rawContentText = entry.querySelector("content")?.textContent;
-      if (rawContentText) {
-        const parsedContentDocument = domParser.parseFromString(
-          rawContentText,
-          "text/html"
-        );
-        const extractedTitleSnippet = getTitleSnippetFromContentText(
-          parsedContentDocument.body.textContent
-        );
-        if (extractedTitleSnippet) {
-          title = extractedTitleSnippet.trim();
-        }
-      }
-    }
-
-    const dateTimestamp = (
-      entry.querySelector("published") || entry.querySelector("updated")
-    )?.textContent.trim();
-    if (!dateTimestamp) {
-      console.error(
-        `Entry in feed ${feedURL} is missing a published or updated date. Will fall back to current date.`,
-        entry.outerHTML
+        "Failed to process Atom feed article data for entry:",
+        entry.outerHTML,
+        e
       );
     }
-
-    /**
-     * @type {string | null}
-     */
-    let thumbnailURL = null;
-
-    const mediaThumbnailURL = entry
-      .querySelector("media\\:thumbnail")
-      ?.getAttribute("url")
-      .trim();
-    if (mediaThumbnailURL && URL.canParse(mediaThumbnailURL)) {
-      thumbnailURL = mediaThumbnailURL;
-    }
-
-    parsedArticles[articleURL] = {
-      url: articleURL,
-      title,
-      thumbnail: thumbnailURL
-        ? {
-            url: thumbnailURL,
-            alt: "",
-          }
-        : null,
-      publishedAt: dateTimestamp ? new Date(dateTimestamp).getTime() : 0,
-      feedURL,
-      read: 0,
-    };
   }
 
   await updateSavedArticles(parsedArticles);
@@ -329,8 +298,8 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
   }
 
   const headers = new Headers({
-    "If-None-Match": feed.etag,
-    "If-Modified-Since": feed.lastModified,
+    "If-None-Match": feed.etag ?? "",
+    "If-Modified-Since": feed.lastModified ?? "",
   });
 
   const feedResponse = await proxiedFetch(feed.url, {

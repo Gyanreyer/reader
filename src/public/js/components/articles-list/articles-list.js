@@ -101,6 +101,9 @@ export class ArticlesList extends LitElement {
     this._settingsSubscription.unsubscribe();
   }
 
+  /**
+   * @returns {Promise<void>}
+   */
   async _updateArticlesList() {
     this._areArticlesStale = false;
 
@@ -189,9 +192,13 @@ export class ArticlesList extends LitElement {
             type="checkbox"
             id="filter-include-unread"
             ?checked="${settings.get("filter_IncludeUnread")}"
-            @change="${async (event) => {
-              await settings.set("filter_IncludeUnread", event.target.checked);
-            }}"
+            @change="${
+              /**
+               * @param {Event & { target: HTMLInputElement }} event
+               */
+              (event) =>
+                settings.set("filter_IncludeUnread", event.target.checked)
+            }"
           />
         </label>
         ${this._filter_IncludeRead !== null
@@ -201,12 +208,13 @@ export class ArticlesList extends LitElement {
                 type="checkbox"
                 id="filter-include-read"
                 ?checked="${this._filter_IncludeRead}"
-                @change="${async (event) => {
-                  await settings.set(
-                    "filter_IncludeRead",
-                    event.target.checked
-                  );
-                }}"
+                @change="${
+                  /**
+                   * @param {Event & { target: HTMLInputElement }} event
+                   */
+                  (event) =>
+                    settings.set("filter_IncludeRead", event.target.checked)
+                }"
               />
             </label>`
           : null}

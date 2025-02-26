@@ -128,10 +128,12 @@ export class ArticleListItem extends LitElement {
         (!this._article || this._article.feedURL !== article.feedURL)
       ) {
         db.feeds.get(article.feedURL).then((feed) => {
-          this._feedTitle = feed.title;
+          if (feed) {
+            this._feedTitle = feed.title;
+          }
         });
       }
-      this._article = article;
+      this._article = article ?? null;
     });
   }
 
@@ -148,6 +150,10 @@ export class ArticleListItem extends LitElement {
   }
 
   _onClickArticleLink() {
+    if (!this._article) {
+      return;
+    }
+
     // Mark the article as read
     db.articles.update(this._article.url, {
       read: 1,
@@ -155,11 +161,18 @@ export class ArticleListItem extends LitElement {
   }
 
   _onClickToggleRead() {
+    if (!this._article) {
+      return;
+    }
+
     db.articles.update(this._article.url, {
       read: /** @type {0 | 1} */ (this._article.read ^ 1),
     });
   }
 
+  /**
+   * @param {Map<string, any>} changedProperties
+   */
   willUpdate(changedProperties) {
     super.willUpdate(changedProperties);
     if (
@@ -168,9 +181,10 @@ export class ArticleListItem extends LitElement {
       this.isVisible &&
       this._article
     ) {
-      if (this._article.thumbnail === null) {
-        getMetadataForURL(this._article.url).then((metadata) => {
-          db.articles.update(this._article.url, {
+      const article = this._article;
+      if (article.thumbnail === null) {
+        getMetadataForURL(article.url).then((metadata) => {
+          db.articles.update(article.url, {
             thumbnail: metadata?.thumbnail ?? NO_THUMBNAIL,
           });
         });

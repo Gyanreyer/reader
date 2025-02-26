@@ -49,12 +49,14 @@ export async function getMetadataForURL(url) {
   const ogTitleText = parsedDocument
     .querySelector("meta[property='og:title']")
     ?.getAttribute("content")
-    .trim();
+    ?.trim();
 
   if (ogTitleText) {
     title = ogTitleText;
   } else {
-    const titleText = parsedDocument.querySelector("title")?.textContent.trim();
+    const titleText = parsedDocument
+      .querySelector("title")
+      ?.textContent?.trim();
     if (titleText) {
       title = titleText;
     }
@@ -68,7 +70,7 @@ export async function getMetadataForURL(url) {
   const ogImageURL = parsedDocument
     .querySelector("meta[property='og:image']")
     ?.getAttribute("content")
-    .trim();
+    ?.trim();
 
   if (ogImageURL && URL.canParse(ogImageURL)) {
     thumbnailURL = ogImageURL;
@@ -78,13 +80,15 @@ export async function getMetadataForURL(url) {
     parsedDocument
       .querySelector("meta[property='og:image:alt']")
       ?.getAttribute("content")
-      .trim() ?? "";
+      ?.trim() ?? "";
 
   return {
     title,
-    thumbnail: {
-      url: thumbnailURL,
-      alt: thumbnailImageAlt,
-    },
+    thumbnail: thumbnailURL
+      ? {
+          url: thumbnailURL,
+          alt: thumbnailImageAlt,
+        }
+      : null,
   };
 }

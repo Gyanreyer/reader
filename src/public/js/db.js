@@ -17,13 +17,14 @@ import { Dexie } from "/lib/dexie.js";
  * @typedef {{
  *  url: string;
  *  feedURL: string;
- *  title: string;
+ *  title: string | null;
  *  publishedAt: number;
  *  read: 0 | 1;
  *  thumbnail: {
  *    url: string;
  *    alt: string;
  *  } | "NO_THUMBNAIL" | null;
+ *  wordCount: number | null;
  * }} Article
  */
 
