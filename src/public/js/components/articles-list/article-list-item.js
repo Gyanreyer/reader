@@ -192,7 +192,7 @@ export class ArticleListItem extends LitElement {
             src="${thumbnail.url}"
             alt="${thumbnail.alt}"
             loading="lazy"
-            onerror="this.parentElement.style.display = 'none'"
+            onerror="this.style.display = 'none'"
           />`
         : null}
       <h2>
