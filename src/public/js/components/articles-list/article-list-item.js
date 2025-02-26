@@ -197,7 +197,12 @@ export class ArticleListItem extends LitElement {
       return;
     }
 
-    const { url, title, thumbnail, publishedAt, read } = this._article;
+    const { url, title, thumbnail, wordCount, publishedAt, read } =
+      this._article;
+
+    const estimatedReadingDurationMinutes = wordCount
+      ? Math.ceil(wordCount / 200)
+      : null;
 
     return html`<article data-read="${read === 1}">
       ${thumbnail && thumbnail !== NO_THUMBNAIL
@@ -216,6 +221,15 @@ export class ArticleListItem extends LitElement {
       </h2>
       <p>${this._feedTitle}</p>
       <p>${new Date(publishedAt).toLocaleString()}</p>
+      ${wordCount && estimatedReadingDurationMinutes
+        ? html`
+            <p>${wordCount} words</p>
+            <p>
+              ${estimatedReadingDurationMinutes}
+              minute${estimatedReadingDurationMinutes === 1 ? "" : "s"}
+            </p>
+          `
+        : null}
       <button aria-label="Actions" popovertarget="menu-popover">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
           <use href="/spritesheet.svg#menu-dots"></use>
