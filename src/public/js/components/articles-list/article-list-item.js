@@ -3,6 +3,8 @@ import { liveQuery } from "/lib/dexie.js";
 import { db } from "/js/db.js";
 import { getMetadataForURL } from "../../getMetadataForURL.js";
 
+import "../relative-date/relative-date.js";
+
 /**
  * @import { Article } from '/js/db.js';
  */
@@ -26,12 +28,22 @@ export class ArticleListItem extends LitElement {
   };
 
   static styles = css`
+    .sr-only {
+      position: absolute;
+      clip: rect(1px, 1px, 1px, 1px);
+      padding: 0;
+      border: 0;
+      height: 1px;
+      width: 1px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
     article {
       --menu-button-size: 1.5rem;
       --inline-padding: 0.75rem;
       padding-block: 1rem;
-      padding-inline-start: var(--inline-padding);
-      padding-inline-end: calc(var(--menu-button-size) + var(--inline-padding));
+      padding-inline: 0.75rem;
       background: bisque;
       border-radius: 0.5rem;
       display: flex;
@@ -60,23 +72,74 @@ export class ArticleListItem extends LitElement {
       font-size: 0.9rem;
     }
 
-    button[popovertarget="menu-popover"] {
-      position: absolute;
-      padding: 0;
-      inset-block-start: 0.5rem;
-      inset-inline-end: 0.5rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      border: 1px solid black;
-      width: var(--menu-button-size);
+    #article-info {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      column-gap: 0.2rem;
     }
 
-    button[popovertarget="menu-popover"] svg {
-      width: 100%;
+    #author,
+    #published-at {
+      grid-column: 1 / 2;
+    }
+
+    #word-count,
+    #reading-duration {
+      grid-column: 3 / 4;
+    }
+
+    #author,
+    #word-count {
+      grid-row: 1 / 2;
+    }
+
+    #published-at,
+    #reading-duration {
+      grid-row: 2 / 3;
+    }
+
+    #article-info p {
+      margin: 0;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    #article-info svg {
       height: auto;
+      color: rgba(0, 0, 0, 0.4);
+    }
+
+    #word-count svg {
+      width: 1.8em;
+    }
+
+    #reading-duration svg {
+      width: 1.4em;
+      margin-inline: 0.2em;
+    }
+
+    header {
+      display: flex;
+    }
+
+    #toggle-read {
+      margin-inline-start: auto;
+      margin-block-end: auto;
+    }
+
+    #icon--mark-read,
+    #icon--mark-unread {
+      display: none;
+    }
+
+    #toggle-read[data-read="false"] #icon--mark-read {
+      display: block;
+    }
+
+    #toggle-read[data-read="true"] #icon--mark-unread {
+      display: block;
     }
   `;
 
@@ -200,45 +263,80 @@ export class ArticleListItem extends LitElement {
     const { url, title, thumbnail, wordCount, publishedAt, read } =
       this._article;
 
+    const parsedPublishedAt = new Date(publishedAt);
+
     const estimatedReadingDurationMinutes = wordCount
       ? Math.ceil(wordCount / 200)
       : null;
 
     return html`<article data-read="${read === 1}">
-      ${thumbnail && thumbnail !== NO_THUMBNAIL
-        ? html`<img
-            id="thumbnail"
-            src="${thumbnail.url}"
-            alt="${thumbnail.alt}"
-            loading="lazy"
-            onerror="this.style.display = 'none'"
-          />`
-        : null}
-      <h2>
-        <a href="${url}" target="_blank" @click="${this._onClickArticleLink}"
-          >${title}</a
+      <header>
+        <div>
+          ${thumbnail && thumbnail !== NO_THUMBNAIL
+            ? html`<img
+                id="thumbnail"
+                src="${thumbnail.url}"
+                alt="${thumbnail.alt}"
+                loading="lazy"
+                onerror="this.style.display = 'none'"
+              />`
+            : null}
+          <h2>
+            <a
+              href="${url}"
+              target="_blank"
+              @click="${this._onClickArticleLink}"
+              >${title}</a
+            >
+          </h2>
+        </div>
+        <button
+          @click=${this._onClickToggleRead}
+          id="toggle-read"
+          data-read=${read === 1}
         >
-      </h2>
-      <p>${this._feedTitle}</p>
-      <p>${new Date(publishedAt).toLocaleString()}</p>
-      ${wordCount && estimatedReadingDurationMinutes
-        ? html`
-            <p>${wordCount} words</p>
-            <p>
-              ${estimatedReadingDurationMinutes}
-              minute${estimatedReadingDurationMinutes === 1 ? "" : "s"}
-            </p>
-          `
-        : null}
-      <button aria-label="Actions" popovertarget="menu-popover">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-          <use href="/spritesheet.svg#menu-dots"></use>
-        </svg>
-      </button>
-      <div popover id="menu-popover">
-        <button @click=${this._onClickToggleRead} id="toggle-read">
           Mark as ${read === 1 ? "unread" : "read"}
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+            <use href="/icons.svg#visibility-on" id="icon--mark-read"></use>
+            <use href="/icons.svg#visibility-off" id="icon--mark-unread"></use>
+          </svg>
         </button>
+      </header>
+      <div id="article-info">
+        <p id="author">${this._feedTitle}</p>
+        <p id="published-at">
+          <span class="sr-only">Published</span>
+          <time datetime="${parsedPublishedAt.toISOString()}"
+            ><relative-date
+              >${parsedPublishedAt.toLocaleString()}</relative-date
+            ></time
+          >
+        </p>
+        <p id="word-count">
+          ${wordCount
+            ? html`<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                >
+                  <use href="/icons.svg#words"></use>
+                </svg>
+                ${wordCount} words`
+            : null}
+        </p>
+        <p id="reading-duration">
+          ${estimatedReadingDurationMinutes
+            ? html`<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                >
+                  <use href="/icons.svg#clock"></use>
+                </svg>
+                ${estimatedReadingDurationMinutes}
+                minute${estimatedReadingDurationMinutes === 1 ? "" : "s"}`
+            : null}
+        </p>
       </div>
     </article>`;
   }

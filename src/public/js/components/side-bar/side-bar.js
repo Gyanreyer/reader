@@ -42,14 +42,14 @@ export class SideBar extends LitElement {
     :host([data-expanded])
       #toggle-menu-button
       svg
-      use[href$="#hamburger-menu"] {
+      use[href="/icons.svg#hamburger-menu"] {
       display: none;
     }
 
     :host(:not([data-expanded]))
       #toggle-menu-button
       svg
-      use[href$="#left-arrow"] {
+      use[href="/icons.svg#left-arrow"] {
       display: none;
     }
 
@@ -73,8 +73,8 @@ export class SideBar extends LitElement {
     return html`
       <button @click=${this._toggleCollapse} id="toggle-menu-button">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-          <use href="/spritesheet.svg#hamburger-menu"></use>
-          <use href="/spritesheet.svg#left-arrow"></use>
+          <use href="/icons.svg#hamburger-menu"></use>
+          <use href="/icons.svg#left-arrow"></use>
         </svg>
       </button>
       <slot></slot>

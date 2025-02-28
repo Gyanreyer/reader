@@ -17,8 +17,14 @@
     <style @raw="getBundle('css')" webc:keep></style>
   </head>
   <body>
+    <icon-spritesheet></icon-spritesheet>
     <template @raw="content" webc:nokeep></template>
 
     <script @raw="getBundle('js')" type="module" webc:keep></script>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+      }
+    </style>
   </body>
 </html>

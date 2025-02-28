@@ -182,7 +182,7 @@ export class ArticlesList extends LitElement {
         id="filters-button"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-          <use href="/spritesheet.svg#filter-icon"></use>
+          <use href="/icons.svg#filter"></use>
         </svg>
       </button>
       <div popover id="filters-popover">
