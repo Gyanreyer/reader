@@ -124,6 +124,7 @@ export class ArticleListItem extends LitElement {
     #thumbnail {
       display: block;
       max-width: min(100%, 420px);
+      height: auto;
       margin-block-end: 0.25rem;
       border-radius: 4px;
     }
@@ -308,14 +309,35 @@ export class ArticleListItem extends LitElement {
       ? Math.ceil(wordCount / 200)
       : null;
 
+    let thumbnailURL = null;
+    let thumbnailAlt = "";
+    let thumbnailWidth = "";
+    let thumbnailHeight = "";
+    let isBlobThumbnail = false;
+    if (thumbnail && thumbnail !== NO_THUMBNAIL) {
+      if (thumbnail.blob) {
+        thumbnailURL = URL.createObjectURL(thumbnail.blob);
+        isBlobThumbnail = true;
+      } else {
+        thumbnailURL = thumbnail.url;
+      }
+
+      thumbnailAlt = thumbnail.alt;
+      thumbnailWidth = String(thumbnail.width ?? "");
+      thumbnailHeight = String(thumbnail.height ?? "");
+    }
+
     return html`<article data-read="${read === 1}">
       <header>
         <div id="thumbnail-and-title">
-          ${thumbnail && thumbnail !== NO_THUMBNAIL
+          ${thumbnailURL
             ? html`<img
                 id="thumbnail"
-                src="${thumbnail.url}"
-                alt="${thumbnail.alt}"
+                src="${thumbnailURL}"
+                alt="${thumbnailAlt}"
+                width="${thumbnailWidth}"
+                height="${thumbnailHeight}"
+                @onload="${() => URL.revokeObjectURL(thumbnailURL)}"
                 loading="lazy"
                 onerror="this.style.display = 'none'"
               />`

@@ -4,6 +4,17 @@ const domParser = new DOMParser();
 
 /**
  * @param {string} url
+ *
+ * @returns {Promise<{
+ *  title: string | null;
+ *  thumbnail: {
+ *    url: string;
+ *    alt: string;
+ *    blob: Blob|null;
+ *    width: number;
+ *    height: number;
+ *  } | null;
+ * } | null>}
  */
 export async function getMetadataForURL(url) {
   const response = await proxiedFetch(url, {
@@ -66,6 +77,13 @@ export async function getMetadataForURL(url) {
    * @type {string | null}
    */
   let thumbnailURL = null;
+  let thumbnailImageAlt = "";
+  /**
+   * @type {Blob | null}
+   */
+  let cachedThumbnailBlob = null;
+  let thumbnailWidth = 0;
+  let thumbnailHeight = 0;
 
   const ogImageURL = parsedDocument
     .querySelector("meta[property='og:image']")
@@ -73,14 +91,72 @@ export async function getMetadataForURL(url) {
     ?.trim();
 
   if (ogImageURL && URL.canParse(ogImageURL)) {
-    thumbnailURL = ogImageURL;
-  }
+    const blobResult = await proxiedFetch(ogImageURL, {
+      method: "GET",
+      headers: {
+        "Content-Type": "image/*",
+      },
+    }).then((res) => {
+      if (!res.ok) {
+        console.error(
+          `Unable to fetch thumbnail URL: received ${res.status} ${res.statusText} response from URL ${ogImageURL}`
+        );
+        return null;
+      }
 
-  const thumbnailImageAlt =
-    parsedDocument
-      .querySelector("meta[property='og:image:alt']")
-      ?.getAttribute("content")
-      ?.trim() ?? "";
+      return res.blob().then(async (blob) => {
+        cachedThumbnailBlob = blob;
+        /**
+         * @type {number}
+         */
+        let timeoutID;
+        let blobURL = URL.createObjectURL(blob);
+        const imageDimensions =
+          await /** @type {Promise<{ width: number; height: number; } | null>} */ (
+            new Promise((resolve) => {
+              const image = new Image();
+              image.onload = () => {
+                resolve({
+                  width: image.width,
+                  height: image.height,
+                });
+              };
+              image.onerror = () => {
+                console.error("Error loading image");
+                resolve(null);
+              };
+              image.src = blobURL;
+              timeoutID = window.setTimeout(() => {
+                console.error("Image load timeout");
+                resolve(null);
+              }, 5000);
+            })
+          ).finally(() => {
+            URL.revokeObjectURL(blobURL);
+            clearTimeout(timeoutID);
+          });
+
+        return {
+          blob,
+          width: imageDimensions?.width ?? 0,
+          height: imageDimensions?.height ?? 0,
+        };
+      });
+    });
+
+    if (blobResult) {
+      cachedThumbnailBlob = blobResult.blob;
+      thumbnailWidth = blobResult.width;
+      thumbnailHeight = blobResult.height;
+
+      thumbnailURL = ogImageURL;
+      thumbnailImageAlt =
+        parsedDocument
+          .querySelector("meta[property='og:image:alt']")
+          ?.getAttribute("content")
+          ?.trim() ?? "";
+    }
+  }
 
   return {
     title,
@@ -88,6 +164,9 @@ export async function getMetadataForURL(url) {
       ? {
           url: thumbnailURL,
           alt: thumbnailImageAlt,
+          blob: cachedThumbnailBlob,
+          width: thumbnailWidth,
+          height: thumbnailHeight,
         }
       : null,
   };

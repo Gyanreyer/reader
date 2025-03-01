@@ -23,6 +23,9 @@ import { Dexie } from "/lib/dexie.js";
  *  thumbnail: {
  *    url: string;
  *    alt: string;
+ *    blob?: Blob | null;
+ *    width?: number;
+ *    height?: number;
  *  } | "NO_THUMBNAIL" | null;
  *  wordCount: number | null;
  * }} Article
