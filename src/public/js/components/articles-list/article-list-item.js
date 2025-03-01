@@ -44,16 +44,82 @@ export class ArticleListItem extends LitElement {
       --inline-padding: 0.75rem;
       padding-block: 1rem;
       padding-inline: 0.75rem;
-      background: bisque;
+      background-color: white;
+      box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.5);
       border-radius: 0.5rem;
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
-      position: relative;
+      height: 100%;
+      box-sizing: border-box;
+      justify-content: end;
+      transition: opacity 0.1s;
     }
 
     article[data-read="true"] {
-      opacity: 0.7;
+      opacity: 0.75;
+    }
+
+    header {
+      display: flex;
+      gap: 1rem;
+      flex: 1;
+    }
+
+    header h2 {
+      margin: 0;
+    }
+
+    header a {
+      color: var(--clr-blue);
+    }
+
+    #thumbnail-and-title {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      justify-content: end;
+    }
+
+    #toggle-read {
+      margin-inline-start: auto;
+      margin-block-end: auto;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+      border-bottom: 1.5px solid currentColor;
+      font-weight: bold;
+      color: var(--clr-blue);
+    }
+
+    [data-read="true"] #toggle-read {
+      color: var(--clr-red);
+    }
+
+    #toggle-read svg {
+      /** Take the icon's height in a little; there's a lot of empty padding on the
+       *  top and bottom of the icon which makes the button's alignment feel weird
+       */
+      width: 20px;
+      height: auto;
+      margin-block: -2px;
+    }
+
+    #icon--mark-read,
+    #icon--mark-unread {
+      display: none;
+    }
+
+    [data-read="false"] #icon--mark-read {
+      display: block;
+    }
+
+    [data-read="true"] #icon--mark-unread {
+      display: block;
     }
 
     #thumbnail {
@@ -61,10 +127,6 @@ export class ArticleListItem extends LitElement {
       max-width: min(100%, 420px);
       margin-block-end: 0.25rem;
       border-radius: 4px;
-    }
-
-    article h2 {
-      margin: 0;
     }
 
     article p {
@@ -76,6 +138,7 @@ export class ArticleListItem extends LitElement {
       display: grid;
       grid-template-columns: auto 1fr auto;
       column-gap: 0.2rem;
+      color: var(--clr-brown);
     }
 
     #author,
@@ -108,7 +171,7 @@ export class ArticleListItem extends LitElement {
 
     #article-info svg {
       height: auto;
-      color: rgba(0, 0, 0, 0.4);
+      opacity: 0.75;
     }
 
     #word-count svg {
@@ -118,28 +181,6 @@ export class ArticleListItem extends LitElement {
     #reading-duration svg {
       width: 1.4em;
       margin-inline: 0.2em;
-    }
-
-    header {
-      display: flex;
-    }
-
-    #toggle-read {
-      margin-inline-start: auto;
-      margin-block-end: auto;
-    }
-
-    #icon--mark-read,
-    #icon--mark-unread {
-      display: none;
-    }
-
-    #toggle-read[data-read="false"] #icon--mark-read {
-      display: block;
-    }
-
-    #toggle-read[data-read="true"] #icon--mark-unread {
-      display: block;
     }
   `;
 
@@ -271,7 +312,7 @@ export class ArticleListItem extends LitElement {
 
     return html`<article data-read="${read === 1}">
       <header>
-        <div>
+        <div id="thumbnail-and-title">
           ${thumbnail && thumbnail !== NO_THUMBNAIL
             ? html`<img
                 id="thumbnail"
@@ -290,11 +331,7 @@ export class ArticleListItem extends LitElement {
             >
           </h2>
         </div>
-        <button
-          @click=${this._onClickToggleRead}
-          id="toggle-read"
-          data-read=${read === 1}
-        >
+        <button @click=${this._onClickToggleRead} id="toggle-read">
           Mark as ${read === 1 ? "unread" : "read"}
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
             <use href="/icons.svg#visibility-on" id="icon--mark-read"></use>

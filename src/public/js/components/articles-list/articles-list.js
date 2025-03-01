@@ -30,7 +30,7 @@ export class ArticlesList extends LitElement {
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 0.75rem;
     }
 
     #filters-button {

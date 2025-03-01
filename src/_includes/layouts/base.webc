@@ -24,6 +24,18 @@
     <style>
       :root {
         font-family: system-ui, sans-serif;
+
+        /** Theme colors */
+        --clr-red: #db2b39;
+        --clr-blue: #378bda;
+        --clr-orange: #f3a712;
+        --clr-tan: #f0cea0;
+        --clr-brown: #534d41;
+      }
+
+      body {
+        background-color: var(--clr-orange);
+        color: var(--clr-blue);
       }
     </style>
   </body>
