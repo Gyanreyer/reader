@@ -35,7 +35,7 @@
 
       body {
         background-color: var(--clr-orange);
-        color: var(--clr-blue);
+        color: var(--clr-brown);
       }
     </style>
   </body>

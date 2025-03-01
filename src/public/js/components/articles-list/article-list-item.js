@@ -42,8 +42,7 @@ export class ArticleListItem extends LitElement {
     article {
       --menu-button-size: 1.5rem;
       --inline-padding: 0.75rem;
-      padding-block: 1rem;
-      padding-inline: 0.75rem;
+      padding: 1rem;
       background-color: white;
       box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.5);
       border-radius: 0.5rem;
@@ -138,7 +137,6 @@ export class ArticleListItem extends LitElement {
       display: grid;
       grid-template-columns: auto 1fr auto;
       column-gap: 0.2rem;
-      color: var(--clr-brown);
     }
 
     #author,

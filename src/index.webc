@@ -35,8 +35,6 @@ description: "Ryan's RSS Feed Reader"
   }
 
   main {
-    margin-block: 3.5rem;
-    margin-inline: 1rem;
     transition: transform 0.2s;
   }
 

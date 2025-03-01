@@ -27,7 +27,7 @@ export class ArticlesList extends LitElement {
   static styles = css`
     ul {
       list-style-type: none;
-      padding: 0;
+      padding-inline: 1rem;
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
@@ -38,6 +38,17 @@ export class ArticlesList extends LitElement {
       inset-block-start: 1rem;
       inset-inline-end: 1rem;
       z-index: 1;
+    }
+
+    header {
+      padding-block: 3rem 1.5rem;
+      padding-inline: 2rem;
+      background: var(--clr-tan);
+      box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    header h1 {
+      margin: 0;
     }
   `;
 
@@ -87,6 +98,24 @@ export class ArticlesList extends LitElement {
       this._filter_IncludeRead = filter_IncludeRead;
       this._updateArticlesList();
     });
+
+    const filterFeedURL = new URLSearchParams(window.location.search).get(
+      "filter-feed-url"
+    );
+
+    /**
+     * @type {string | null}
+     */
+    this._listHeaderText = "All Articles";
+    if (filterFeedURL) {
+      this._listHeaderText = null;
+      db.feeds.get(filterFeedURL).then((feed) => {
+        if (feed) {
+          this._listHeaderText = `Articles from ${feed.title}`;
+          this.requestUpdate();
+        }
+      });
+    }
   }
 
   disconnectedCallback() {
@@ -176,15 +205,18 @@ export class ArticlesList extends LitElement {
       this._totalArticleCount > currentPageNumber * ArticlesList.PAGE_SIZE;
 
     return html`
-      <button
-        aria-label="Filter settings"
-        popovertarget="filters-popover"
-        id="filters-button"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-          <use href="/icons.svg#filter"></use>
-        </svg>
-      </button>
+      <header>
+        <h1>${this._listHeaderText}</h1>
+        <button
+          aria-label="Filter settings"
+          popovertarget="filters-popover"
+          id="filters-button"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+            <use href="/icons.svg#filter"></use>
+          </svg>
+        </button>
+      </header>
       <div popover id="filters-popover">
         <label>
           Include unread
