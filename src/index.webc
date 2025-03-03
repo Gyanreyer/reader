@@ -18,15 +18,15 @@ description: "Ryan's RSS Feed Reader"
 </main>
 <style>
   body {
+    display: flex;
+    height: 100vh;
     margin: 0;
     overflow-x: clip;
-    --side-bar-width: min(12rem, 40vw);
+    overflow-y: hidden;
   }
 
   side-bar {
-    background-color: aliceblue;
     border-right: 1px solid black;
-    width: var(--side-bar-width);
     z-index: 1;
   }
 
@@ -35,11 +35,9 @@ description: "Ryan's RSS Feed Reader"
   }
 
   main {
+    flex: 1;
+    overflow-y: auto;
     transition: transform 0.2s;
-  }
-
-  side-bar[data-expanded] + main {
-    transform: translateX(calc(var(--side-bar-width) + 1rem));
   }
 
   side-bar aside {
@@ -48,6 +46,7 @@ description: "Ryan's RSS Feed Reader"
     height: 100%;
     padding-block: 1rem 4rem;
     padding-inline: 1rem;
+    background-color: white;
   }
 </style>
 <script

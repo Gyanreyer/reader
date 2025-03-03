@@ -99,6 +99,10 @@ export class ArticleListItem extends LitElement {
       color: var(--clr-red);
     }
 
+    [data-read="false"] #toggle-read {
+      margin-inline-start: 2.2ch;
+    }
+
     #toggle-read svg {
       /** Take the icon's height in a little; there's a lot of empty padding on the
        *  top and bottom of the icon which makes the button's alignment feel weird

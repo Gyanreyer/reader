@@ -11,20 +11,36 @@ export class SideBar extends LitElement {
 
   static styles = css`
     :host {
-      position: fixed;
-      top: 0;
-      left: 0;
+      width: min(18rem, 30vw);
       height: 100vh;
-      transform: translateX(-100%);
-      visibility: hidden;
-      transition-property: transform, opacity, visibility;
-      transition-duration: 0.2s;
     }
 
-    :host([data-expanded]) {
-      transform: none;
-      visibility: visible;
-      transition-duration: 0.2s, 0.2s, 0s;
+    #backdrop {
+      display: none;
+    }
+
+    @media screen and (max-width: 600px) {
+      :host {
+        width: min(18rem, 80vw);
+        position: absolute;
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition-property: transform, opacity, visibility;
+        transition-duration: 0.2s;
+      }
+      :host([data-expanded]) {
+        transform: none;
+        visibility: visible;
+        transition-duration: 0.2s, 0.2s, 0s;
+      }
+
+      :host([data-expanded]) #backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: -1;
+      }
     }
 
     #toggle-menu-button {
@@ -78,14 +94,9 @@ export class SideBar extends LitElement {
         </svg>
       </button>
       <slot></slot>
+      <div id="backdrop"></div>
     `;
   }
-
-  /**
- *       <button @click=${this._toggleCollapse} id="close-button">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"></svg>
-      </button>
- */
 
   static {
     customElements.define("side-bar", SideBar);
