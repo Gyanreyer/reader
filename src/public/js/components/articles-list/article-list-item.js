@@ -43,8 +43,8 @@ export class ArticleListItem extends LitElement {
       --menu-button-size: 1.5rem;
       --inline-padding: 0.75rem;
       padding: 1rem;
-      background-color: white;
-      box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.5);
+      background-color: var(--clr-light);
+      box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.3);
       border-radius: 0.5rem;
       display: flex;
       flex-direction: column;
@@ -70,7 +70,7 @@ export class ArticleListItem extends LitElement {
     }
 
     header a {
-      color: var(--clr-blue);
+      color: var(--clr-positive-action);
     }
 
     #thumbnail-and-title {
@@ -92,11 +92,11 @@ export class ArticleListItem extends LitElement {
       align-items: center;
       border-bottom: 1.5px solid currentColor;
       font-weight: bold;
-      color: var(--clr-blue);
+      color: var(--clr-positive-action);
     }
 
     [data-read="true"] #toggle-read {
-      color: var(--clr-red);
+      color: var(--clr-negative-action);
     }
 
     [data-read="false"] #toggle-read {
@@ -130,6 +130,7 @@ export class ArticleListItem extends LitElement {
       max-width: min(100%, 420px);
       margin-block-end: 0.25rem;
       border-radius: 4px;
+      box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.15);
     }
 
     article p {

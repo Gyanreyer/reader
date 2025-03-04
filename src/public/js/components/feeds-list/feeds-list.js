@@ -22,6 +22,11 @@ export class FeedsList extends LitElement {
       flex-direction: column;
       gap: 0.5rem;
     }
+
+    li a {
+      color: var(--clr-positive-action);
+      font-weight: 600;
+    }
   `;
 
   constructor() {
@@ -48,7 +53,9 @@ export class FeedsList extends LitElement {
   render() {
     return html`
       <ul>
-        <a href="?">All</a>
+        <li>
+          <a href="?">All</a>
+        </li>
         ${this._feeds?.map(
           (feed) =>
             html`<li>

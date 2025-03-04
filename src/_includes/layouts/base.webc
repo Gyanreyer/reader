@@ -25,16 +25,17 @@
         font-family: system-ui, sans-serif;
 
         /** Theme colors */
-        --clr-red: #db2b39;
-        --clr-blue: #378bda;
-        --clr-orange: #f3a712;
-        --clr-tan: #f0cea0;
-        --clr-brown: #534d41;
+        --clr-negative-action: #db2b39;
+        --clr-positive-action: #377bbb;
+        --clr-bg: #F0C987;
+        --clr-accent: #DB4C40;
+        --clr-dark: #3f3b33;
+        --clr-light: #fffcf5;
       }
 
       body {
-        background-color: var(--clr-orange);
-        color: var(--clr-brown);
+        background-color: var(--clr-bg);
+        color: var(--clr-dark);
       }
     </style>
   </body>

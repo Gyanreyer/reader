@@ -43,7 +43,8 @@ export class ArticlesList extends LitElement {
     header {
       padding-block: 3rem 1.5rem;
       padding-inline: 2rem;
-      background: var(--clr-tan);
+      background: var(--clr-accent);
+      color: white;
       box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.5);
     }
 

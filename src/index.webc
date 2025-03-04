@@ -46,7 +46,7 @@ description: "Ryan's RSS Feed Reader"
     height: 100%;
     padding-block: 1rem 4rem;
     padding-inline: 1rem;
-    background-color: white;
+    background-color: var(--clr-light);
   }
 </style>
 <script
