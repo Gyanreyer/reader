@@ -2,71 +2,78 @@ import { css, html, LitElement } from "/lib/lit.js";
 
 export class SideBar extends LitElement {
   static properties = {
-    isExpanded: {
-      attribute: "data-expanded",
+    _isMobile: {
+      attribute: "data-mobile",
       type: Boolean,
-      reflect: true,
+      Reflect: true,
     },
   };
 
   static styles = css`
     :host {
-      width: min(18rem, 30vw);
+      max-width: min(18rem, 30vw);
       height: 100vh;
-    }
-
-    #backdrop {
-      display: none;
+      background-color: var(--clr-light);
+      display: flex;
+      flex-direction: column;
     }
 
     @media screen and (max-width: 600px) {
       :host {
-        width: min(18rem, 80vw);
-        position: absolute;
-        transform: translateX(-100%);
-        visibility: hidden;
-        transition-property: transform, opacity, visibility;
-        transition-duration: 0.2s;
-      }
-      :host([data-expanded]) {
-        transform: none;
-        visibility: visible;
-        transition-duration: 0.2s, 0.2s, 0s;
-      }
-
-      :host([data-expanded]) #backdrop {
-        display: block;
         position: fixed;
-        inset: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: -1;
+        inset-block-start: 0;
+        inset-inline-start: 0;
+        height: auto;
       }
     }
 
-    #toggle-menu-button {
-      position: absolute;
-      inset-block-start: 1rem;
-      inset-inline-start: calc(100% + 1rem);
-      visibility: visible;
-      transition: transform 0.2s;
+    dialog {
+      inset-block-start: 0;
+      inset-inline-start: 0;
+      width: min(18rem, 80vw);
+      height: 100vh;
+      margin: unset;
+      max-width: unset;
+      max-height: unset;
+      padding: 0;
+      overflow: hidden;
+      flex-direction: column;
+      background-color: var(--clr-light);
+      opacity: 0;
+      transform: translateX(-100%);
+      transition: opacity, transform, display allow-discrete,
+        overlay allow-discrete;
+      transition-duration: 0.2s;
     }
 
-    :host([data-expanded]) #toggle-menu-button {
-      transform: translateX(calc(-50% - 1rem));
+    dialog[open] {
+      display: flex;
+      opacity: 1;
+      transform: translateX(0);
+      transition: opacity 0.2s, transform 0.2s;
     }
 
-    :host([data-expanded])
-      #toggle-menu-button
-      svg
-      use[href="/icons.svg#hamburger-menu"] {
-      display: none;
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(2px);
+      opacity: 0;
+      transition: opacity, display allow-discrete;
+      transition-duration: 0.2s;
     }
 
-    :host(:not([data-expanded]))
-      #toggle-menu-button
-      svg
-      use[href="/icons.svg#left-arrow"] {
-      display: none;
+    dialog[open]::backdrop {
+      opacity: 1;
+    }
+
+    @starting-style {
+      dialog[open] {
+        opacity: 0;
+        transform: translateX(-100%);
+      }
+
+      dialog[open]::backdrop {
+        opacity: 0;
+      }
     }
 
     #close-button {
@@ -77,24 +84,54 @@ export class SideBar extends LitElement {
   constructor() {
     super();
 
-    this.isExpanded = localStorage.getItem("sidebar-expanded") === "true";
+    /**
+     * @param {MediaQueryListEvent} event
+     */
+    this._onMobileQueryChanged = (event) => {
+      this._isMobile = event.matches;
+    };
+
+    this._mobileQuery = window.matchMedia("(max-width: 600px)");
+    this._mobileQuery.addEventListener("change", this._onMobileQueryChanged);
+    this._isMobile = this._mobileQuery.matches;
   }
 
-  _toggleCollapse() {
-    this.isExpanded = !this.isExpanded;
-    localStorage.setItem("sidebar-expanded", String(this.isExpanded));
+  disconnectedCallback() {
+    super.disconnectedCallback();
+
+    this._mobileQuery.removeEventListener("change", this._onMobileQueryChanged);
   }
 
   render() {
     return html`
-      <button @click=${this._toggleCollapse} id="toggle-menu-button">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-          <use href="/icons.svg#hamburger-menu"></use>
-          <use href="/icons.svg#left-arrow"></use>
-        </svg>
-      </button>
-      <slot></slot>
-      <div id="backdrop"></div>
+      ${this._isMobile
+        ? html`<button
+              @click="${
+                /**
+                 * @param {*} evt
+                 */
+                (evt) => evt.currentTarget.nextElementSibling.showModal()
+              }"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                <use href="/icons.svg#hamburger-menu"></use>
+              </svg>
+            </button>
+            <dialog>
+              <form method="dialog">
+                <button id="toggle-menu-button" type="">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                  >
+                    <use href="/icons.svg#left-arrow"></use>
+                  </svg>
+                </button>
+              </form>
+              <slot></slot>
+            </dialog>`
+        : html`<slot></slot>`}
     `;
   }
 

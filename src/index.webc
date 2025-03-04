@@ -34,19 +34,16 @@ description: "Ryan's RSS Feed Reader"
     display: none;
   }
 
+  side-bar aside {
+    padding-block: 1rem 4rem;
+    padding-inline: 1rem;
+    overflow-y: auto;
+  }
+
   main {
     flex: 1;
     overflow-y: auto;
     transition: transform 0.2s;
-  }
-
-  side-bar aside {
-    box-sizing: border-box;
-    overflow-y: auto;
-    height: 100%;
-    padding-block: 1rem 4rem;
-    padding-inline: 1rem;
-    background-color: var(--clr-light);
   }
 </style>
 <script
