@@ -342,5 +342,9 @@
   {
     "name": "Defector",
     "url": "https://defector.com/feed"
+  },
+  {
+    "name": "LocalThunk",
+    "url": "https://localthunk.com/?format=rss"
   }
 ]
