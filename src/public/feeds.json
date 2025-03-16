@@ -346,5 +346,9 @@
   {
     "name": "Terminal",
     "url": "https://terminal.ahumanfuture.co/feed.xml"
+  },
+  {
+    "name": "Bryn Newell | Creative Developer",
+    "url": "https://bryn.codes/feed.xml"
   }
 ]
