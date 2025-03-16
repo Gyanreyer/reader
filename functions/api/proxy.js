@@ -7,7 +7,8 @@
  */
 export const onRequest = async (context) => {
   const responseHeaders = new Headers({
-    "Access-Control-Allow-Origin": "https://reader.geyer.dev",
+    "Access-Control-Allow-Origin": `https://${context.env.ALLOWED_ORIGIN}`,
+    Vary: "Origin",
     "Access-Control-Allow-Methods": "GET",
   });
 

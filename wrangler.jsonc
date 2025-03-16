@@ -3,5 +3,6 @@
   "pages_build_output_dir": "./_site",
   "vars": {
     "ALLOWED_ORIGIN": "reader.geyer.dev"
-  }
+  },
+  "compatibility_date": "2025-02-04"
 }
