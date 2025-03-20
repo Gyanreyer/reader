@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" :data-theme="theme">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -31,11 +31,6 @@
         --clr-accent: #DB4C40;
         --clr-dark: #3f3b33;
         --clr-light: #fffcf5;
-      }
-
-      body {
-        background-color: var(--clr-bg);
-        color: var(--clr-dark);
       }
     </style>
   </body>

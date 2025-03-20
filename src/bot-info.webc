@@ -1,0 +1,52 @@
+---
+layout: "layouts/base.webc"
+
+title: "Feed Reader Bot"
+description: "Feed Reader Bot"
+---
+
+<h1>Feed Reader Bot</h1>
+<p>
+  The source code for this feed reader may be found here:
+  <a href="https://github.com/Gyanreyer/reader"
+    >https://github.com/Gyanreyer/reader</a
+  >
+</p>
+<p>
+  If you're reading this that probably means I did something wrong, so first of
+  all, I apologize.
+</p>
+<p>
+  This is a simple self-hosted feed reader. All feed data is persisted
+  client-side with IndexedDB and requests to RSS feeds are simply proxied
+  through a Cloudflare worker to get around CORS restrictions.
+</p>
+<p>
+  The app is built to respect your bandwidth as much as possible. It will only
+  fetch feeds up to once every 2 hours, and it respects Last-Modified and ETag
+  headers whenever possible. If you are experiencing an issue with this app
+  hitting your feed too frequently, please let me know!
+</p>
+<p>
+  To contact me about an issue, please open an issue on the GitHub repository
+  linked above, or you may reach out to me directly on Bluesky:
+  <a href="https://bsky.app/profile/ryan.geyer.dev">@ryan.geyer.dev</a>
+</p>
+<style>
+  :root {
+    font-family: system-ui, sans-serif;
+  }
+
+  body {
+    margin: 4rem auto;
+    max-width: 52ch;
+  }
+
+  dl {
+    display: inline-block;
+  }
+
+  dd {
+    display: inline;
+  }
+</style>

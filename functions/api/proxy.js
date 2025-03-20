@@ -64,6 +64,7 @@ export const onRequest = async (context) => {
     const proxyRequestHeaders = new Headers({
       "If-None-Match": requestEtag,
       "If-Modified-Since": requestIfModifiedSince,
+      "User-Agent": context.env.USER_AGENT,
     });
 
     const proxiedResponse = await fetch(proxyURL, {
