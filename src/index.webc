@@ -1,23 +1,31 @@
 ---
 layout: "layouts/base.webc"
-theme: "dark"
 
 title: "Feed Reader"
 description: "Ryan's RSS Feed Reader"
 ---
 
-<side-bar>
-  <aside>
-    <nav>
-      <feeds-list></feeds-list>
-    </nav>
-  </aside>
-</side-bar>
-<main>
-  <articles-list></articles-list>
-</main>
+<filters-provider>
+  <articles-provider>
+    <side-bar>
+      <aside>
+        <nav>
+          <feeds-list></feeds-list>
+        </nav>
+      </aside>
+    </side-bar>
+    <main>
+      <head-ing></head-ing>
+      <articles-list></articles-list>
+      <foot-er></foot-er>
+    </main>
+  </articles-provider>
+</filters-provider>
 <style>
   body {
+    background-color: var(--clr-bg);
+    color: var(--clr-dark);
+
     display: flex;
     height: 100vh;
     margin: 0;

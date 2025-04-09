@@ -382,6 +382,8 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
 }
 
 export async function refreshAllArticles() {
+  const initialArticlesCount = await db.articles.count();
+
   await refreshFeeds();
 
   const feeds = await db.feeds.toArray();
@@ -416,5 +418,7 @@ export async function refreshAllArticles() {
       );
     }
   }
-  window.dispatchEvent(new CustomEvent("reader:all-articles-refreshed"));
+
+  const newArticlesCount = (await db.articles.count()) - initialArticlesCount;
+  return newArticlesCount;
 }
