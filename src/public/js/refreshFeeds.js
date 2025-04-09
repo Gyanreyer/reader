@@ -12,9 +12,11 @@ export async function refreshFeeds() {
 
   const feedsResponse = await fetch(FEEDS_URL, {
     method: "GET",
-    headers: {
-      "If-None-Match": feedsEtag,
-    },
+    headers: feedsEtag
+      ? {
+          "If-None-Match": feedsEtag,
+        }
+      : undefined,
   });
 
   if (feedsResponse.status === 304) {
@@ -29,10 +31,11 @@ export async function refreshFeeds() {
     return false;
   }
 
-  localStorage.setItem(
-    FEEDS_ETAG_LOCALSTORAGE_KEY,
-    feedsResponse.headers.get("Etag")
-  );
+  const responseEtag = feedsResponse.headers.get("Etag");
+
+  if (responseEtag) {
+    localStorage.setItem(FEEDS_ETAG_LOCALSTORAGE_KEY, responseEtag);
+  }
 
   /**
    * @type {{
@@ -57,7 +60,13 @@ export async function refreshFeeds() {
 
   await db.transaction("rw", db.feeds, db.articles, async () => {
     const existingFeedURLs = await db.feeds.toCollection().primaryKeys();
+    /**
+     * @type {string[]}
+     */
     const feedURLsToDelete = [];
+    /**
+     * @type {string[]}
+     */
     const feedURLsToUpdate = [];
 
     for (const feedURL of existingFeedURLs) {
@@ -74,16 +83,28 @@ export async function refreshFeeds() {
     // Write all updated feeds to the DB
     return Promise.all([
       db.feeds.bulkUpdate(
-        feedURLsToUpdate.map((url) => ({
-          key: url,
-          changes: allFeedsMap.get(url),
-        }))
+        feedURLsToUpdate.map((url) => {
+          const feedData = allFeedsMap.get(url);
+          if (!feedData) {
+            throw new Error(`Feed data not found for URL: ${url}`);
+          }
+          return {
+            key: url,
+            changes: feedData,
+          };
+        })
       ),
       db.feeds.bulkPut(
-        feedURLsToAdd.map((url) => ({
-          ...allFeedsMap.get(url),
-          lastRefreshedAt: 0,
-        }))
+        feedURLsToAdd.map((url) => {
+          const feedData = allFeedsMap.get(url);
+          if (!feedData) {
+            throw new Error(`Feed data not found for URL: ${url}`);
+          }
+          return {
+            ...feedData,
+            lastRefreshedAt: 0,
+          };
+        })
       ),
       // Delete feeds that have been removed
       db.feeds.where("url").anyOf(feedURLsToDelete).delete(),

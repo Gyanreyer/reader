@@ -55,7 +55,6 @@ export class ArticlesProvider extends LitElement {
     });
 
     refreshAllArticles().then((newArticlesCount) => {
-      console.log("NEW ARTICLES COUNT", newArticlesCount);
       if (newArticlesCount !== 0) {
         this.updateContextValue({
           areArticlesStale: true,

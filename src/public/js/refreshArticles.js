@@ -419,6 +419,8 @@ export async function refreshAllArticles() {
     }
   }
 
+  window.dispatchEvent(new CustomEvent("reader:articles-refresh-complete"));
+
   const newArticlesCount = (await db.articles.count()) - initialArticlesCount;
   return newArticlesCount;
 }

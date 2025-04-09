@@ -36,8 +36,7 @@ export class ArticlesList extends LitElement {
 
     this._articlesContextConsumer = new ContextConsumer(this, {
       context: articlesContext,
-      callback: (newValue) => {
-        console.log(newValue);
+      callback: () => {
         this.requestUpdate();
       },
       subscribe: true,

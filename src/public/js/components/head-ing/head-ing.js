@@ -1,9 +1,9 @@
 import { ContextConsumer, css, html, LitElement } from "/lib/lit.js";
 
 import { db } from "/js/db.js";
-import { settings } from "/js/settings.js";
 import { articlesContext } from "/js/context/articlesContext.js";
-import { ArticlesProvider } from "/js/context/articles-provider.js";
+
+import "./refresh-progress-bar.js";
 
 export class Heading extends LitElement {
   static properties = {
@@ -30,6 +30,13 @@ export class Heading extends LitElement {
 
     header h1 {
       margin: 0;
+    }
+
+    refresh-progress-bar {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline: 0;
+      z-index: 1;
     }
   `;
 
@@ -70,6 +77,7 @@ export class Heading extends LitElement {
     const { areArticlesStale } = this._articlesContextConsumer.value ?? {};
 
     return html`<header>
+      <refresh-progress-bar></refresh-progress-bar>
       <h1>${this._listHeaderText}</h1>
       ${areArticlesStale
         ? html`<button @click="${this.onClickRefreshArticles}">
