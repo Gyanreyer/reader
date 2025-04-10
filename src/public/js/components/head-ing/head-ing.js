@@ -39,6 +39,24 @@ export class Heading extends LitElement {
       inset-inline: 0;
       z-index: 1;
     }
+
+    #refresh-button {
+      position: fixed;
+      inset-block-start: 1rem;
+      inset-inline-start: 50%;
+      display: none;
+      opacity: 0;
+      transform: translate(-50%, -50%);
+      transition-property: opacity, transform, display;
+      transition-duration: 0.2s;
+      transition-behavior: allow-discrete;
+    }
+
+    #refresh-button[data-active="true"] {
+      display: block;
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
   `;
 
   constructor() {
@@ -80,11 +98,13 @@ export class Heading extends LitElement {
     return html`<header>
       <refresh-progress-bar></refresh-progress-bar>
       <h1>${this._listHeaderText}</h1>
-      ${areArticlesStale
-        ? html`<button @click="${this.onClickRefreshArticles}">
-            New articles available
-          </button>`
-        : null}
+      <button
+        id="refresh-button"
+        data-active="${areArticlesStale}"
+        @click="${this.onClickRefreshArticles}"
+      >
+        New articles available
+      </button>
     </header>`;
   }
 

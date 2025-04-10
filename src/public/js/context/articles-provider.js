@@ -56,6 +56,17 @@ export class ArticlesProvider extends LitElement {
       subscribe: true,
     });
 
+    window.addEventListener("reader:refresh-article-list", () => {
+      const filterContextValue = this._filtersContextConsumer.value;
+      if (filterContextValue) {
+        this.updateArticlesList(filterContextValue);
+      }
+    });
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+
     refreshAllArticles({
       onProgress: (progress) => {
         this.updateContextValue({
@@ -70,13 +81,6 @@ export class ArticlesProvider extends LitElement {
           areArticlesStale: hasNewArticles,
         });
       },
-    });
-
-    window.addEventListener("reader:refresh-article-list", () => {
-      const filterContextValue = this._filtersContextConsumer.value;
-      if (filterContextValue) {
-        this.updateArticlesList(filterContextValue);
-      }
     });
   }
 
@@ -97,6 +101,10 @@ export class ArticlesProvider extends LitElement {
    * @returns {Promise<void>}
    */
   async updateArticlesList({ includeUnread, includeRead }) {
+    this.updateContextValue({
+      areArticlesStale: false,
+    });
+
     const searchParams = new URLSearchParams(window.location.search);
     const filterFeedURL = searchParams.get("filter-feed-url");
 
@@ -140,7 +148,6 @@ export class ArticlesProvider extends LitElement {
         .offset(pageStartIndex)
         .limit(ArticlesProvider.PAGE_SIZE)
         .primaryKeys(),
-      areArticlesStale: false,
       pageNumber,
       pageSize: ArticlesProvider.PAGE_SIZE,
     });

@@ -9,17 +9,17 @@ export class RefreshProgressBar extends LitElement {
       z-index: 1;
       block-size: 0.4rem;
       background-color: var(--clr-light);
-      visibility: hidden;
+      display: none;
       transform: scaleY(0);
       transform-origin: top center;
-      --transition-duration: 0.5s;
-      transition: transform var(--transition-duration), visibility 0s;
-      transition-delay: var(--transition-duration),
-        calc(var(--transition-duration) * 2);
+      transition-property: transform, display;
+      transition-duration: 0.4s;
+      transition-delay: 0.6s;
+      transition-behavior: allow-discrete;
     }
 
     :host([data-active]) {
-      visibility: visible;
+      display: block;
       transform: scaleY(1);
       transition-delay: 0s;
     }
@@ -37,9 +37,12 @@ export class RefreshProgressBar extends LitElement {
   constructor() {
     super();
 
+    this.toggleAttribute("data-active", false);
+
     this._articlesContextConsumer = new ContextConsumer(this, {
       context: articlesContext,
-      callback: () => {
+      callback: (newContextValue) => {
+        this.toggleAttribute("data-active", newContextValue.isRefreshing);
         this.requestUpdate();
       },
       subscribe: true,
@@ -47,10 +50,7 @@ export class RefreshProgressBar extends LitElement {
   }
 
   render() {
-    const { refreshProgress = 0, isRefreshing = false } =
-      this._articlesContextConsumer.value ?? {};
-
-    this.toggleAttribute("data-active", isRefreshing);
+    const { refreshProgress = 0 } = this._articlesContextConsumer.value ?? {};
 
     return html`<div
       aria-label="Refreshing articles for feeds"
