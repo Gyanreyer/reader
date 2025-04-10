@@ -4,9 +4,11 @@ import { createContext } from "/lib/lit.js";
  * @typedef {{
  *  articleURLs: string[];
  *  totalArticleCount: number;
- *  areArticlesStale: boolean;
  *  pageNumber: number;
  *  pageSize: number;
+ *  isRefreshing: boolean;
+ *  refreshProgress: number;
+ *  areArticlesStale: boolean;
  * }} ArticlesContextValue
  */
 

@@ -36,6 +36,8 @@ export class ArticlesProvider extends LitElement {
     this._contextValue = {
       articleURLs: [],
       totalArticleCount: 0,
+      refreshProgress: 0,
+      isRefreshing: false,
       areArticlesStale: false,
       pageNumber,
       pageSize: ArticlesProvider.PAGE_SIZE,
@@ -54,12 +56,20 @@ export class ArticlesProvider extends LitElement {
       subscribe: true,
     });
 
-    refreshAllArticles().then((newArticlesCount) => {
-      if (newArticlesCount !== 0) {
+    refreshAllArticles({
+      onProgress: (progress) => {
         this.updateContextValue({
-          areArticlesStale: true,
+          refreshProgress: progress,
+          isRefreshing: true,
         });
-      }
+      },
+      onComplete: (hasNewArticles) => {
+        this.updateContextValue({
+          refreshProgress: 1,
+          isRefreshing: false,
+          areArticlesStale: hasNewArticles,
+        });
+      },
     });
 
     window.addEventListener("reader:refresh-article-list", () => {

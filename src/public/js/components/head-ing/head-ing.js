@@ -21,6 +21,7 @@ export class Heading extends LitElement {
     }
 
     header {
+      position: relative;
       padding-block: 3rem 1.5rem;
       padding-inline: 2rem;
       background: var(--clr-accent);

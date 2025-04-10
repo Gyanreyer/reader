@@ -381,31 +381,27 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
   }
 }
 
-export async function refreshAllArticles() {
-  const initialArticlesCount = await db.articles.count();
+/**
+ * @param {object} callbacks
+ * @param {(progress: number)=>void} callbacks.onProgress
+ * @param {(hasNewArticles: boolean)=>void} callbacks.onComplete
+ */
+export async function refreshAllArticles({ onProgress, onComplete }) {
+  onProgress(0);
 
   await refreshFeeds();
 
-  const feeds = await db.feeds.toArray();
+  const initialArticlesCount = await db.articles.count();
 
-  window.dispatchEvent(
-    new CustomEvent("reader:articles-refresh-started", {
-      detail: {
-        feedCount: feeds.length,
-      },
-    })
-  );
+  const feeds = await db.feeds.toArray();
+  const feedCount = feeds.length;
+
+  let refreshedFeedCount = 0;
 
   const results = await Promise.allSettled(
     feeds.map(async (feed) => {
       await refreshArticlesForFeed(feed);
-      window.dispatchEvent(
-        new CustomEvent("reader:articles-refreshed-feed", {
-          detail: {
-            feedURL: feed.url,
-          },
-        })
-      );
+      onProgress(++refreshedFeedCount / feedCount);
     })
   );
 
@@ -419,8 +415,7 @@ export async function refreshAllArticles() {
     }
   }
 
-  window.dispatchEvent(new CustomEvent("reader:articles-refresh-complete"));
+  const newArticlesCount = await db.articles.count();
 
-  const newArticlesCount = (await db.articles.count()) - initialArticlesCount;
-  return newArticlesCount;
+  onComplete(newArticlesCount !== initialArticlesCount);
 }
