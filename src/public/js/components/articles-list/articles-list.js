@@ -3,6 +3,7 @@ import { css, html, LitElement, repeat, ContextConsumer } from "/lib/lit.js";
 import { articlesContext } from "/js/context/articlesContext.js";
 
 import "./article-list-item.js";
+import "./refresh-button.js";
 
 export class ArticlesList extends LitElement {
   static PAGE_SIZE = 48;
@@ -25,9 +26,15 @@ export class ArticlesList extends LitElement {
     ul {
       list-style-type: none;
       padding-inline: 1rem;
+      margin-block-start: 1rem;
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+    }
+
+    refresh-button {
+      position: sticky;
+      inset-block-start: 0rem;
     }
   `;
 
@@ -47,6 +54,7 @@ export class ArticlesList extends LitElement {
     const { articleURLs = [] } = this._articlesContextConsumer.value ?? {};
 
     return html`
+      <refresh-button></refresh-button>
       <ul>
         ${repeat(
           articleURLs,

@@ -13,6 +13,10 @@ export class Heading extends LitElement {
   };
 
   static styles = css`
+    :host {
+      display: block;
+    }
+
     #filters-button {
       position: fixed;
       inset-block-start: 1rem;
@@ -38,24 +42,6 @@ export class Heading extends LitElement {
       inset-block-start: 0;
       inset-inline: 0;
       z-index: 1;
-    }
-
-    #refresh-button {
-      position: fixed;
-      inset-block-start: 1rem;
-      inset-inline-start: 50%;
-      display: none;
-      opacity: 0;
-      transform: translate(-50%, -50%);
-      transition-property: opacity, transform, display;
-      transition-duration: 0.2s;
-      transition-behavior: allow-discrete;
-    }
-
-    #refresh-button[data-active="true"] {
-      display: block;
-      opacity: 1;
-      transform: translate(-50%, 0);
     }
   `;
 
@@ -93,18 +79,9 @@ export class Heading extends LitElement {
   }
 
   render() {
-    const { areArticlesStale } = this._articlesContextConsumer.value ?? {};
-
     return html`<header>
       <refresh-progress-bar></refresh-progress-bar>
       <h1>${this._listHeaderText}</h1>
-      <button
-        id="refresh-button"
-        data-active="${areArticlesStale}"
-        @click="${this.onClickRefreshArticles}"
-      >
-        New articles available
-      </button>
     </header>`;
   }
 

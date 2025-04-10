@@ -55,13 +55,6 @@ export class ArticlesProvider extends LitElement {
       },
       subscribe: true,
     });
-
-    window.addEventListener("reader:refresh-article-list", () => {
-      const filterContextValue = this._filtersContextConsumer.value;
-      if (filterContextValue) {
-        this.updateArticlesList(filterContextValue);
-      }
-    });
   }
 
   connectedCallback() {
@@ -97,10 +90,18 @@ export class ArticlesProvider extends LitElement {
   }
 
   /**
-   * @param {FiltersContextValue} filtersContextValue
+   * @param {FiltersContextValue} [filtersContextValue]
    * @returns {Promise<void>}
    */
-  async updateArticlesList({ includeUnread, includeRead }) {
+  async updateArticlesList(
+    filtersContextValue = this._filtersContextConsumer.value
+  ) {
+    if (!filtersContextValue) {
+      throw new Error("Filters context value is not available");
+    }
+
+    const { includeRead, includeUnread } = filtersContextValue;
+
     this.updateContextValue({
       areArticlesStale: false,
     });
