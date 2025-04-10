@@ -1,6 +1,9 @@
-import { ArticlesProvider } from "/js/context/articles-provider.js";
 import { articlesContext } from "/js/context/articlesContext.js";
 import { LitElement, html, css, ContextConsumer } from "/lib/lit.js";
+
+/**
+ * @import { ArticlesProvider } from "/js/context/articles-provider.js";
+ */
 
 export class RefreshButton extends LitElement {
   static styles = css`
@@ -22,7 +25,8 @@ export class RefreshButton extends LitElement {
       width: max-content;
       font-size: 1.1rem;
       background-color: var(--clr-light);
-      border: 2px solid currentColor;
+      border: 1.5px solid currentColor;
+      box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.3);
       border-radius: 12px;
       padding: 0.4rem 1.2rem;
       margin-block-start: 0.5rem;
@@ -40,7 +44,6 @@ export class RefreshButton extends LitElement {
     :host([data-active]) button {
       opacity: 1;
       transform: none;
-      box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.3);
 
       &:active {
         transform: scale(0.97);
@@ -61,13 +64,17 @@ export class RefreshButton extends LitElement {
     });
   }
 
+  /**
+   * @type {ArticlesProvider|null}
+   */
+  _cachedArticlesProvider = null;
+  _getArticlesProvider() {
+    return (this._cachedArticlesProvider ??=
+      document.querySelector("articles-provider"));
+  }
+
   _refresh() {
-    const articlesProvider =
-      document.getElementsByTagName("articles-provider")[0];
-    if (!(articlesProvider instanceof ArticlesProvider)) {
-      throw new Error("RefreshButton must be inside ArticlesProvider");
-    }
-    articlesProvider.updateArticlesList();
+    this._getArticlesProvider()?.updateArticlesList();
   }
 
   render() {

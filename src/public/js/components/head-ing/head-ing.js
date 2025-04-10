@@ -4,6 +4,7 @@ import { db } from "/js/db.js";
 import { articlesContext } from "/js/context/articlesContext.js";
 
 import "./refresh-progress-bar.js";
+import "./filter-modal.js";
 
 export class Heading extends LitElement {
   static properties = {
@@ -27,10 +28,13 @@ export class Heading extends LitElement {
     header {
       position: relative;
       padding-block: 3rem 1.5rem;
-      padding-inline: 2rem;
+      padding-inline: 1.5rem 1rem;
       background: var(--clr-accent);
       color: white;
       box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
     }
 
     header h1 {
@@ -82,6 +86,7 @@ export class Heading extends LitElement {
     return html`<header>
       <refresh-progress-bar></refresh-progress-bar>
       <h1>${this._listHeaderText}</h1>
+      <filter-modal></filter-modal>
     </header>`;
   }
 
@@ -89,43 +94,3 @@ export class Heading extends LitElement {
     customElements.define("head-ing", Heading);
   }
 }
-
-/**
- *       <!--
-      <button
-        aria-label="Filter settings"
-        popovertarget="filters-popover"
-        id="filters-button"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-          <use href="/icons.svg#filter"></use>
-        </svg>
-      </button>
-      <div popover id="filters-popover">
-        <label>
-          Include unread
-          <input
-            type="checkbox"
-            id="filter-include-unread"
-            ?checked="${settings.get("filter_IncludeUnread")}"
-            @change="${
-        (event) => settings.set("filter_IncludeUnread", event.target.checked)
-      }"
-          />
-        </label>
-        ${this._filter_IncludeRead !== null
-        ? html`<label>
-            Include read
-            <input
-              type="checkbox"
-              id="filter-include-read"
-              ?checked="${this._filter_IncludeRead}"
-              @change="${
-                (event) =>
-                  settings.set("filter_IncludeRead", event.target.checked)
-              }"
-            />
-          </label>`
-        : null}
-      </div>-->
- */
