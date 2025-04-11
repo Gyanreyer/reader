@@ -61,17 +61,18 @@ export class ArticlesProvider extends LitElement {
     super.connectedCallback();
 
     refreshAllArticles({
-      onProgress: (progress) => {
+      onProgress: (progress, hasNewArticles) => {
         this.updateContextValue({
           refreshProgress: progress,
           isRefreshing: true,
+          areArticlesStale:
+            this._contextValue.areArticlesStale || hasNewArticles,
         });
       },
-      onComplete: (hasNewArticles) => {
+      onComplete: () => {
         this.updateContextValue({
           refreshProgress: 1,
           isRefreshing: false,
-          areArticlesStale: hasNewArticles,
         });
       },
     });

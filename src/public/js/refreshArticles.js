@@ -13,6 +13,8 @@ const domParser = new DOMParser();
  * @param {{
  *  [articleURL: string]: Article;
  * }} parsedArticles
+ *
+ * @returns {Promise<number>} The number of new articles that were added to the database
  */
 async function updateSavedArticles(parsedArticles) {
   const allFoundArticleURLs = Object.keys(parsedArticles);
@@ -39,6 +41,8 @@ async function updateSavedArticles(parsedArticles) {
       )
     );
   });
+
+  return articleURLsToAdd.size;
 }
 
 const WHITE_SPACE_REGEX = /\s+/;
@@ -191,7 +195,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
     }
   }
 
-  await updateSavedArticles(parsedArticles);
+  return updateSavedArticles(parsedArticles);
 }
 
 /**
@@ -238,7 +242,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
     }
   }
 
-  await updateSavedArticles(parsedArticles);
+  return updateSavedArticles(parsedArticles);
 }
 
 /**
@@ -280,12 +284,14 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
     }
   }
 
-  await updateSavedArticles(parsedArticles);
+  return updateSavedArticles(parsedArticles);
 }
 
 /**
  * @param {import("./db.js").Feed} feed
  * @param {boolean} [shouldForceRefresh=false] If true, the feed will be refreshed regardless of the last refresh time
+
+ * @returns {Promise<number>} The number of new articles that were added to the database
  */
 export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
   if (!shouldForceRefresh) {
@@ -293,7 +299,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     const lastRefreshedAt = feed.lastRefreshedAt ?? 0;
     // If less time has elapsed since last refresh than the refresh interval, don't refresh
     if (Date.now() - lastRefreshedAt <= refreshInterval) {
-      return;
+      return 0;
     }
   }
 
@@ -312,7 +318,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     db.feeds.update(feed.url, {
       lastRefreshedAt: Date.now(),
     });
-    return;
+    return 0;
   }
 
   if (!feedResponse.ok) {
@@ -383,15 +389,13 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
 
 /**
  * @param {object} callbacks
- * @param {(progress: number)=>void} callbacks.onProgress
- * @param {(hasNewArticles: boolean)=>void} callbacks.onComplete
+ * @param {(progress: number, hasNewArticles: boolean)=>void} callbacks.onProgress
+ * @param {()=>void} callbacks.onComplete
  */
 export async function refreshAllArticles({ onProgress, onComplete }) {
-  onProgress(0);
+  onProgress(0, false);
 
   await refreshFeeds();
-
-  const initialArticlesCount = await db.articles.count();
 
   const feeds = await db.feeds.toArray();
   const feedCount = feeds.length;
@@ -400,8 +404,8 @@ export async function refreshAllArticles({ onProgress, onComplete }) {
 
   const results = await Promise.allSettled(
     feeds.map(async (feed) => {
-      await refreshArticlesForFeed(feed);
-      onProgress(++refreshedFeedCount / feedCount);
+      const newArticlesCount = await refreshArticlesForFeed(feed);
+      onProgress(++refreshedFeedCount / feedCount, newArticlesCount > 0);
     })
   );
 
@@ -415,7 +419,5 @@ export async function refreshAllArticles({ onProgress, onComplete }) {
     }
   }
 
-  const newArticlesCount = await db.articles.count();
-
-  onComplete(newArticlesCount !== initialArticlesCount);
+  onComplete();
 }
