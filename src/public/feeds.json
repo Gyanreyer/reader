@@ -354,5 +354,9 @@
   {
     "name": "Loganius' Site",
     "url": "https://loganius.org/feed/"
+  },
+  {
+    "name": "Planet Detroit",
+    "url": "https://planetdetroit.org/feed"
   }
 ]
