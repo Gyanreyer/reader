@@ -5,7 +5,9 @@ import { db } from "/js/db.js";
  * @import { Feed } from '/js/db.js';
  */
 
-export class FeedsList extends LitElement {
+export default class FeedsList extends LitElement {
+  static tagName = "feeds-list";
+
   static get properties() {
     return {
       _feeds: {
@@ -26,6 +28,10 @@ export class FeedsList extends LitElement {
     li a {
       color: var(--clr-positive-action);
       font-weight: 600;
+    }
+
+    li a[aria-current="page"] {
+      color: var(--clr-accent);
     }
   `;
 
@@ -51,24 +57,30 @@ export class FeedsList extends LitElement {
   }
 
   render() {
+    const currentFeedURL = new URLSearchParams(window.location.search).get(
+      "filter-feed-url"
+    );
+
     return html`
       <ul>
         <li>
-          <a href="?">All</a>
+          <a href="?" aria-current=${!currentFeedURL ? "page" : "false"}>All</a>
         </li>
-        ${this._feeds?.map(
-          (feed) =>
-            html`<li>
-              <a href=${`?filter-feed-url=${encodeURIComponent(feed.url)}`}
-                >${feed.title}</a
-              >
-            </li>`
-        ) ?? ""}
+        ${this._feeds?.map((feed) => {
+          return html`<li>
+            <a
+              href=${`?filter-feed-url=${encodeURIComponent(feed.url)}`}
+              aria-current=${currentFeedURL === feed.url ? "page" : "false"}
+            >
+              ${feed.title}
+            </a>
+          </li>`;
+        }) ?? ""}
       </ul>
     `;
   }
 
   static {
-    customElements.define("feeds-list", FeedsList);
+    customElements.define(this.tagName, this);
   }
 }

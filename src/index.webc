@@ -7,7 +7,7 @@ description: "Ryan's RSS Feed Reader"
 
 <filters-provider>
   <articles-provider>
-    <side-bar>
+    <side-bar id="sidebar" role="menu" popover>
       <aside>
         <nav>
           <feeds-list></feeds-list>
@@ -15,9 +15,23 @@ description: "Ryan's RSS Feed Reader"
       </aside>
     </side-bar>
     <main>
-      <head-ing></head-ing>
-      <articles-list></articles-list>
-      <foot-er></foot-er>
+      <refresh-button></refresh-button>
+      <header>
+        <refresh-progress-bar></refresh-progress-bar>
+        <nav>
+          <button popovertarget="sidebar" id="sidebar-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+              <use href="/icons.svg#hamburger-menu"></use>
+            </svg>
+          </button>
+          <header-title></header-title>
+          <filter-modal></filter-modal>
+        </nav>
+      </header>
+      <div id="main-content">
+        <articles-list></articles-list>
+        <foot-er></foot-er>
+      </div>
     </main>
   </articles-provider>
 </filters-provider>
@@ -48,15 +62,56 @@ description: "Ryan's RSS Feed Reader"
     overflow-y: auto;
   }
 
+  #sidebar-button {
+    border-radius: 8px;
+    padding: 0.2rem;
+    cursor: pointer;
+    border: 1px solid currentColor;
+    box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  #sidebar-button svg {
+    display: block;
+  }
+
   main {
     flex: 1;
     overflow-y: auto;
     transition: transform 0.2s;
   }
+
+  refresh-button {
+    position: sticky;
+    inset-block-start: 0rem;
+  }
+
+  main header {
+    background-color: vaR(--clr-accent);
+    color: white;
+    box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  main header nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem 1.5rem 1.5rem 1rem;
+  }
+
+  #main-content {
+    padding: 1rem;
+  }
+
+  @media screen and (min-width: 600px) {
+    #sidebar-button {
+      display: none;
+    }
+
+    main header nav {
+      padding-block-start: 3rem;
+      padding-inline-start: 1.5rem;
+    }
+  }
 </style>
-<script
-  src="/js/entrypoints/index.js"
-  webc:keep
-  type="module"
-  crossorigin="anonymous"
-></script>
+<script type="module" src="/js/entrypoint.js" webc:keep></script>

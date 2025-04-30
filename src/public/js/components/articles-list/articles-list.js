@@ -3,9 +3,10 @@ import { css, html, LitElement, repeat, ContextConsumer } from "/lib/lit.js";
 import { articlesContext } from "/js/context/articlesContext.js";
 
 import "./article-list-item.js";
-import "./refresh-button.js";
 
-export class ArticlesList extends LitElement {
+export default class ArticlesList extends LitElement {
+  static tagName = "articles-list";
+
   static PAGE_SIZE = 48;
 
   static get properties() {
@@ -25,8 +26,8 @@ export class ArticlesList extends LitElement {
   static styles = css`
     ul {
       list-style-type: none;
-      padding-inline: 1rem;
-      margin-block-start: 1rem;
+      padding: 0;
+      margin: 0;
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
@@ -51,10 +52,19 @@ export class ArticlesList extends LitElement {
   }
 
   render() {
-    const { articleURLs = [] } = this._articlesContextConsumer.value ?? {};
+    const articlesContextValue = this._articlesContextConsumer.value;
+
+    if (!articlesContextValue) {
+      return null;
+    }
+
+    const { articleURLs, isLoadingArticles } = articlesContextValue;
+
+    if (articleURLs.length === 0 && !isLoadingArticles) {
+      return html`<p class="no-articles-msg">No articles found.</p>`;
+    }
 
     return html`
-      <refresh-button></refresh-button>
       <ul>
         ${repeat(
           articleURLs,
@@ -69,6 +79,6 @@ export class ArticlesList extends LitElement {
   }
 
   static {
-    customElements.define("articles-list", ArticlesList);
+    customElements.define(this.tagName, this);
   }
 }

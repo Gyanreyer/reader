@@ -11,14 +11,16 @@ import { db } from "/js/db.js";
 import { Dexie } from "/lib/dexie.js";
 import { refreshAllArticles } from "../refreshArticles.js";
 
-const pageNumber =
+const pageNumberParam =
   Number(new URLSearchParams(window.location.search).get("page")) || 1;
 
 /**
  * @import { ArticlesContextValue } from './articlesContext.js';
  * @import { FiltersContextValue } from './filtersContext.js';
  */
-export class ArticlesProvider extends LitElement {
+export default class ArticlesProvider extends LitElement {
+  static tagName = "articles-provider";
+
   static PAGE_SIZE = 20;
 
   static styles = css`
@@ -35,11 +37,12 @@ export class ArticlesProvider extends LitElement {
      */
     this._contextValue = {
       articleURLs: [],
+      isLoadingArticles: true,
       totalArticleCount: 0,
       refreshProgress: 0,
-      isRefreshing: false,
+      isRefreshing: true,
       areArticlesStale: false,
-      pageNumber,
+      pageNumber: pageNumberParam,
       pageSize: ArticlesProvider.PAGE_SIZE,
     };
 
@@ -105,12 +108,11 @@ export class ArticlesProvider extends LitElement {
 
     this.updateContextValue({
       areArticlesStale: false,
+      isLoadingArticles: true,
     });
 
     const searchParams = new URLSearchParams(window.location.search);
     const filterFeedURL = searchParams.get("filter-feed-url");
-
-    const pageStartIndex = (pageNumber - 1) * ArticlesProvider.PAGE_SIZE;
 
     let articlesCollection;
 
@@ -143,6 +145,16 @@ export class ArticlesProvider extends LitElement {
       }
     }
 
+    const totalArticleCount = await articlesCollection.count();
+
+    const pageNumber = Math.min(
+      pageNumberParam,
+      // Clamp so we can't go to a page that doesn't exist
+      Math.max(Math.ceil(totalArticleCount / ArticlesProvider.PAGE_SIZE), 1)
+    );
+
+    const pageStartIndex = (pageNumber - 1) * ArticlesProvider.PAGE_SIZE;
+
     this.updateContextValue({
       totalArticleCount: await articlesCollection.count(),
       articleURLs: await articlesCollection
@@ -152,6 +164,7 @@ export class ArticlesProvider extends LitElement {
         .primaryKeys(),
       pageNumber,
       pageSize: ArticlesProvider.PAGE_SIZE,
+      isLoadingArticles: false,
     });
   }
 
@@ -160,6 +173,6 @@ export class ArticlesProvider extends LitElement {
   }
 
   static {
-    customElements.define("articles-provider", ArticlesProvider);
+    customElements.define(this.tagName, this);
   }
 }

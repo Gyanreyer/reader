@@ -1,9 +1,9 @@
 import { css, html, LitElement } from "/lib/lit.js";
 import { liveQuery } from "/lib/dexie.js";
 import { db } from "/js/db.js";
-import { getMetadataForURL } from "../../getMetadataForURL.js";
+import { getMetadataForURL } from "/js/getMetadataForURL.js";
 
-import "../relative-date/relative-date.js";
+import "../relative-date.js";
 
 /**
  * @import { Article } from '/js/db.js';
@@ -11,7 +11,9 @@ import "../relative-date/relative-date.js";
 
 const NO_THUMBNAIL = "NO_THUMBNAIL";
 
-export class ArticleListItem extends LitElement {
+export default class ArticleListItem extends LitElement {
+  static tagName = "article-list-item";
+
   static properties = {
     url: {
       type: String,
@@ -382,6 +384,6 @@ export class ArticleListItem extends LitElement {
   }
 
   static {
-    customElements.define("article-list-item", ArticleListItem);
+    customElements.define(this.tagName, this);
   }
 }

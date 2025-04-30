@@ -2,16 +2,17 @@ import { filtersContext } from "/js/context/filtersContext.js";
 import { LitElement, html, css, ContextConsumer } from "/lib/lit.js";
 
 /**
- * @import { FiltersProvider} from '/js/context/filters-provider.js';
+ * @import FiltersProvider from '/js/context/filters-provider.js';
  */
 
-export class FilterModal extends LitElement {
+export default class FilterModal extends LitElement {
+  static tagName = "filter-modal";
+
   static styles = css`
     #filters-button {
       border-radius: 8px;
       padding: 0.2rem;
       cursor: pointer;
-      border: none;
       border: 1px solid currentColor;
       box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.3);
     }
@@ -125,6 +126,6 @@ export class FilterModal extends LitElement {
   }
 
   static {
-    customElements.define("filter-modal", FilterModal);
+    customElements.define(this.tagName, this);
   }
 }

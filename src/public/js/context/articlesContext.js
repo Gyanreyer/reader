@@ -3,6 +3,7 @@ import { createContext } from "/lib/lit.js";
 /**
  * @typedef {{
  *  articleURLs: string[];
+ *  isLoadingArticles: boolean;
  *  totalArticleCount: number;
  *  pageNumber: number;
  *  pageSize: number;

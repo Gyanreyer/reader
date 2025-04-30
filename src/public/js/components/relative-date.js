@@ -1,6 +1,8 @@
 import { html, LitElement } from "/lib/lit.js";
 
-export class RelativeDate extends LitElement {
+export default class RelativeDate extends LitElement {
+  static tagName = "relative-date";
+
   connectedCallback() {
     super.connectedCallback();
 
@@ -82,6 +84,6 @@ export class RelativeDate extends LitElement {
   }
 
   static {
-    customElements.define("relative-date", RelativeDate);
+    customElements.define(this.tagName, this);
   }
 }

@@ -6,7 +6,9 @@ import { settings } from "../settings.js";
  * @import {FiltersContextValue} from './filtersContext.js';}
  */
 
-export class FiltersProvider extends LitElement {
+export default class FiltersProvider extends LitElement {
+  static tagName = "filters-provider";
+
   static styles = css`
     :host {
       display: contents;
@@ -78,6 +80,6 @@ export class FiltersProvider extends LitElement {
   }
 
   static {
-    customElements.define("filters-provider", FiltersProvider);
+    customElements.define(this.tagName, this);
   }
 }

@@ -1,11 +1,15 @@
 import { articlesContext } from "/js/context/articlesContext.js";
 import { LitElement, html, css, ContextConsumer } from "/lib/lit.js";
 
-export class RefreshProgressBar extends LitElement {
+export default class RefreshProgressBar extends LitElement {
+  static tagName = "refresh-progress-bar";
+
   static styles = css`
     :host {
       display: block;
-      position: relative;
+      position: absolute;
+      top: 0;
+      width: 100%;
       z-index: 1;
       block-size: 0.4rem;
       background-color: var(--clr-light);
@@ -63,6 +67,6 @@ export class RefreshProgressBar extends LitElement {
   }
 
   static {
-    customElements.define("refresh-progress-bar", RefreshProgressBar);
+    customElements.define(this.tagName, this);
   }
 }

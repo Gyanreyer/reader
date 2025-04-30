@@ -2,10 +2,12 @@ import { articlesContext } from "/js/context/articlesContext.js";
 import { LitElement, html, css, ContextConsumer } from "/lib/lit.js";
 
 /**
- * @import { ArticlesProvider } from "/js/context/articles-provider.js";
+ * @import ArticlesProvider from "/js/context/articles-provider.js";
  */
 
-export class RefreshButton extends LitElement {
+export default class RefreshButton extends LitElement {
+  static tagName = "refresh-button";
+
   static styles = css`
     :host {
       display: flex;
@@ -89,6 +91,6 @@ export class RefreshButton extends LitElement {
   }
 
   static {
-    customElements.define("refresh-button", RefreshButton);
+    customElements.define(this.tagName, this);
   }
 }

@@ -19,7 +19,6 @@
   <body>
     <template @raw="content" webc:nokeep></template>
 
-    <script @raw="getBundle('js')" type="module" webc:keep></script>
     <style>
       :root {
         font-family: system-ui, sans-serif;
@@ -31,6 +30,10 @@
         --clr-accent: #DB4C40;
         --clr-dark: #3f3b33;
         --clr-light: #fffcf5;
+      }
+
+      im-port {
+        display: none;
       }
     </style>
   </body>
