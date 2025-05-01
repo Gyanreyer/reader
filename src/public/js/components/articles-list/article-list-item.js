@@ -50,7 +50,7 @@ export default class ArticleListItem extends LitElement {
       border-radius: 0.5rem;
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: 0.5rem;
       height: 100%;
       box-sizing: border-box;
       justify-content: end;
@@ -62,24 +62,27 @@ export default class ArticleListItem extends LitElement {
     }
 
     header {
-      display: flex;
-      gap: 1rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      column-gap: 1rem;
+      row-gap: 0.25rem;
       flex: 1;
     }
 
     header h2 {
-      margin: 0;
+      margin-block: 0;
+      margin-inline-end: 0.5rem;
+      grid-column: 1/ 3;
+    }
+
+    header:not([data-has-thumb="true"]) h2 {
+      /** If we don't have a thumbnail, shift the title up to take the thumbnail's place in the grid */
+      grid-row: 1 / 2;
+      grid-column: 1 / 2;
     }
 
     header a {
       color: var(--clr-positive-action);
-    }
-
-    #thumbnail-and-title {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      justify-content: end;
     }
 
     #toggle-read {
@@ -130,7 +133,7 @@ export default class ArticleListItem extends LitElement {
     #thumbnail {
       display: block;
       max-width: min(100%, 420px);
-      margin-block-end: 0.25rem;
+      max-height: 280px;
       border-radius: 4px;
       box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.15);
     }
@@ -315,27 +318,19 @@ export default class ArticleListItem extends LitElement {
       ? Math.ceil(wordCount / 200)
       : null;
 
+    const hasThumbnail = thumbnail !== null && thumbnail !== NO_THUMBNAIL;
+
     return html`<article data-read="${read === 1}">
-      <header>
-        <div id="thumbnail-and-title">
-          ${thumbnail && thumbnail !== NO_THUMBNAIL
-            ? html`<img
-                id="thumbnail"
-                src="${thumbnail.url}"
-                alt="${thumbnail.alt}"
-                loading="lazy"
-                onerror="this.style.display = 'none'"
-              />`
-            : null}
-          <h2>
-            <a
-              href="${url}"
-              target="_blank"
-              @click="${this._onClickArticleLink}"
-              >${title}</a
-            >
-          </h2>
-        </div>
+      <header data-has-thumb="${hasThumbnail}">
+        ${hasThumbnail
+          ? html`<img
+              id="thumbnail"
+              src="${thumbnail.url}"
+              alt="${thumbnail.alt}"
+              loading="lazy"
+              onerror="this.style.display = 'none'; this.parentElement.dataset.hasThumb = false"
+            />`
+          : null}
         <button @click=${this._onClickToggleRead} id="toggle-read">
           Mark as ${read === 1 ? "unread" : "read"}
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
@@ -343,6 +338,11 @@ export default class ArticleListItem extends LitElement {
             <use href="/icons.svg#visibility-off" id="icon--mark-unread"></use>
           </svg>
         </button>
+        <h2>
+          <a href="${url}" target="_blank" @click="${this._onClickArticleLink}"
+            >${title}</a
+          >
+        </h2>
       </header>
       <div id="article-info">
         <p id="author">${this._feedTitle}</p>
