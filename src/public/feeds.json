@@ -362,5 +362,9 @@
   {
     "name": "Sara Soueidan - Blog",
     "url": "https://www.sarasoueidan.com/blog/index.xml"
+  },
+  {
+    "name": "Alex.Party",
+    "url": "https://alex.party/rss.xml"
   }
 ]
