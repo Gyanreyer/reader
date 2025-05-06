@@ -44,7 +44,6 @@ description: "Ryan's RSS Feed Reader"
     height: 100vh;
     margin: 0;
     overflow-x: clip;
-    overflow-y: hidden;
   }
 
   side-bar {
@@ -76,7 +75,6 @@ description: "Ryan's RSS Feed Reader"
 
   main {
     flex: 1;
-    overflow-y: auto;
     transition: transform 0.2s;
   }
 
@@ -104,6 +102,14 @@ description: "Ryan's RSS Feed Reader"
   }
 
   @media screen and (min-width: 600px) {
+    body {
+      overflow-y: hidden;
+    }
+
+    main {
+      overflow-y: auto;
+    }
+
     #sidebar-button {
       display: none;
     }
