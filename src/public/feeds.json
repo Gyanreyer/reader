@@ -358,5 +358,9 @@
   {
     "name": "Planet Detroit",
     "url": "https://planetdetroit.org/feed"
+  },
+  {
+    "name": "Sara Soueidan - Blog",
+    "url": "https://www.sarasoueidan.com/blog/index.xml"
   }
 ]
