@@ -366,5 +366,9 @@
   {
     "name": "Alex.Party",
     "url": "https://alex.party/rss.xml"
+  },
+  {
+    "name": "samwho.dev",
+    "url": "https://samwho.dev/rss.xml"
   }
 ]
