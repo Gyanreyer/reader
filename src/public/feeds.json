@@ -370,5 +370,9 @@
   {
     "name": "samwho.dev",
     "url": "https://samwho.dev/rss.xml"
+  },
+  {
+    "name": "Henry Desroches",
+    "url": "https://henry.codes/rss/writing.xml"
   }
 ]
