@@ -374,5 +374,9 @@
   {
     "name": "Henry Desroches",
     "url": "https://henry.codes/rss/writing.xml"
+  },
+  {
+    "name": "Changelog News",
+    "url": "https://pipedream.changelog.com/news/feed"
   }
 ]
