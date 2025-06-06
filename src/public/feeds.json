@@ -374,5 +374,9 @@
   {
     "name": "Changelog News",
     "url": "https://pipedream.changelog.com/news/feed"
+  },
+  {
+    "name" "The Index",
+    "url": "https://piccalil.li/the-index/feed.xml"
   }
 ]
