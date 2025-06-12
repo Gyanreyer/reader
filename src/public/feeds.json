@@ -378,5 +378,9 @@
   {
     "name" "The Index",
     "url": "https://piccalil.li/the-index/feed.xml"
+  },
+  {
+    "name": "OlegWock blog",
+    "url": "https://sinja.io/rss"
   }
 ]
