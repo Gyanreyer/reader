@@ -382,5 +382,9 @@
   {
     "name": "OlegWock blog",
     "url": "https://sinja.io/rss"
+  },
+  {
+    "name": "CSS Tricks Newsletter",
+    "url": "https://css-tricks.com/rss-for-newsletters/"
   }
 ]
