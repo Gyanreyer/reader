@@ -1,11 +1,27 @@
 import { ContextConsumer, css, html, LitElement } from "/lib/lit.js";
 
 import { articlesContext } from "../context/articlesContext.js";
+import { filtersContext } from "../context/filtersContext.js";
+import { pushHistory } from "../history.js";
 
 export default class Footer extends LitElement {
   static tagName = "foot-er";
 
-  static styles = css``;
+  static styles = css`
+    footer {
+      margin-block-start: 1rem;
+      display: flex;
+      justify-content: space-between;
+      column-gap: 4rem;
+    }
+
+    a {
+      color: var(--clr-positive-action);
+      background-color: var(--clr-light);
+      padding: 4px 8px;
+      border-radius: 8px;
+    }
+  `;
 
   constructor() {
     super();
@@ -17,15 +33,38 @@ export default class Footer extends LitElement {
       },
       subscribe: true,
     });
+
+    this._filtersContextConsumer = new ContextConsumer(this, {
+      context: filtersContext,
+      callback: () => {
+        this.requestUpdate();
+      },
+      subscribe: true,
+    });
+  }
+
+  /**
+   * @param {Event} e
+   */
+  _onClickPageLink(e) {
+    if (e.target instanceof HTMLAnchorElement) {
+      const href = e.target.getAttribute("href");
+      if (href) {
+        e.preventDefault();
+        pushHistory(href);
+      }
+    }
   }
 
   render() {
     const articlesContextValue = this._articlesContextConsumer.value;
-    if (!articlesContextValue) {
+    const filtersContextValue = this._filtersContextConsumer.value;
+    if (!articlesContextValue || !filtersContextValue) {
       return null;
     }
 
-    const { pageNumber, totalArticleCount, pageSize } = articlesContextValue;
+    const { totalArticleCount } = articlesContextValue;
+    const { pageNumber, pageSize } = filtersContextValue;
 
     const totalPageCount = Math.ceil(totalArticleCount / pageSize);
 
@@ -36,18 +75,20 @@ export default class Footer extends LitElement {
     otherPageParams.delete("page");
 
     return html`<footer>
-      <div>
-        ${hasPreviousPage
-          ? html`<a href="?${otherPageParams}&page=${pageNumber - 1}"
-              >Previous page</a
-            >`
-          : null}
-        ${hasNextPage
-          ? html`<a href="?${otherPageParams}&page=${pageNumber + 1}"
-              >Next page</a
-            >`
-          : null}
-      </div>
+      ${hasPreviousPage
+        ? html`<a
+            href="?${otherPageParams}&page=${pageNumber - 1}"
+            @click=${this._onClickPageLink}
+            >&ShortLeftArrow; Previous page</a
+          >`
+        : null}
+      ${hasNextPage
+        ? html`<a
+            href="?${otherPageParams}&page=${pageNumber + 1}"
+            @click=${this._onClickPageLink}
+            >Next page &ShortRightArrow;</a
+          >`
+        : null}
     </footer>`;
   }
 

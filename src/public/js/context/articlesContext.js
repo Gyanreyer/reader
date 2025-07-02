@@ -5,8 +5,6 @@ import { createContext } from "/lib/lit.js";
  *  articleURLs: string[];
  *  isLoadingArticles: boolean;
  *  totalArticleCount: number;
- *  pageNumber: number;
- *  pageSize: number;
  *  isRefreshing: boolean;
  *  refreshProgress: number;
  *  areArticlesStale: boolean;

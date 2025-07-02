@@ -11,17 +11,12 @@ import { db } from "/js/db.js";
 import { Dexie } from "/lib/dexie.js";
 import { refreshAllArticles } from "../refreshArticles.js";
 
-const pageNumberParam =
-  Number(new URLSearchParams(window.location.search).get("page")) || 1;
-
 /**
  * @import { ArticlesContextValue } from './articlesContext.js';
  * @import { FiltersContextValue } from './filtersContext.js';
  */
 export default class ArticlesProvider extends LitElement {
   static tagName = "articles-provider";
-
-  static PAGE_SIZE = 20;
 
   static styles = css`
     :host {
@@ -42,8 +37,6 @@ export default class ArticlesProvider extends LitElement {
       refreshProgress: 0,
       isRefreshing: true,
       areArticlesStale: false,
-      pageNumber: pageNumberParam,
-      pageSize: ArticlesProvider.PAGE_SIZE,
     };
 
     this._provider = new ContextProvider(this, {
@@ -104,7 +97,8 @@ export default class ArticlesProvider extends LitElement {
       throw new Error("Filters context value is not available");
     }
 
-    const { includeRead, includeUnread } = filtersContextValue;
+    const { includeRead, includeUnread, pageNumber, pageSize } =
+      filtersContextValue;
 
     this.updateContextValue({
       areArticlesStale: false,
@@ -147,23 +141,21 @@ export default class ArticlesProvider extends LitElement {
 
     const totalArticleCount = await articlesCollection.count();
 
-    const pageNumber = Math.min(
-      pageNumberParam,
+    const clampedPageNumber = Math.min(
+      pageNumber,
       // Clamp so we can't go to a page that doesn't exist
-      Math.max(Math.ceil(totalArticleCount / ArticlesProvider.PAGE_SIZE), 1)
+      Math.max(Math.ceil(totalArticleCount / pageSize), 1)
     );
 
-    const pageStartIndex = (pageNumber - 1) * ArticlesProvider.PAGE_SIZE;
+    const pageStartIndex = (clampedPageNumber - 1) * pageSize;
 
     this.updateContextValue({
       totalArticleCount: await articlesCollection.count(),
       articleURLs: await articlesCollection
         .reverse()
         .offset(pageStartIndex)
-        .limit(ArticlesProvider.PAGE_SIZE)
+        .limit(pageSize)
         .primaryKeys(),
-      pageNumber,
-      pageSize: ArticlesProvider.PAGE_SIZE,
       isLoadingArticles: false,
     });
   }
