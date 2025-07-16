@@ -394,5 +394,9 @@
   {
     "name": "leanrada.com notes",
     "url": "https://leanrada.com/rss.xml"
+  },
+  {
+    "name": "Clagnut",
+    "url": "https://clagnut.com/feeds/summaries.xml"
   }
 ]
