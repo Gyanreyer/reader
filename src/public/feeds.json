@@ -386,5 +386,13 @@
   {
     "name": "CSS Tricks Newsletter",
     "url": "https://css-tricks.com/rss-for-newsletters/"
+  },
+  {
+    "name": "Ariel Salminen",
+    "url": "https://arielsalminen.com/atom.xml"
+  },
+  {
+    "name": "leanrada.com notes",
+    "url": "https://leanrada.com/rss.xml"
   }
 ]
