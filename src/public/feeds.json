@@ -398,5 +398,9 @@
   {
     "name": "Clagnut",
     "url": "https://clagnut.com/feeds/summaries.xml"
+  },
+  {
+    "name": "A11y Weekly",
+    "url": "https://a11yweekly.com/feed/"
   }
 ]
