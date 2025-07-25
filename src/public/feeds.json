@@ -402,5 +402,9 @@
   {
     "name": "A11y Weekly",
     "url": "https://a11yweekly.com/feed/"
+  },
+  {
+    "name": "Harris Lapiroff",
+    "url": "https://chromamine.com/feeds/posts.xml"
   }
 ]
