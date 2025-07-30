@@ -410,5 +410,9 @@
   {
     "name": "The Pudding",
     "url": "https://pudding.cool/feed/index.xml"
+  },
+  {
+    "name": "Alex Kondov",
+    "url": "https://alexkondov.com/rss.xml"
   }
 ]
