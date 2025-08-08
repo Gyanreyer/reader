@@ -376,7 +376,7 @@
     "url": "https://pipedream.changelog.com/news/feed"
   },
   {
-    "name" "The Index",
+    "name": "The Index",
     "url": "https://piccalil.li/the-index/feed.xml"
   },
   {
@@ -426,5 +426,9 @@
   {
     "name": "Ben Holmen",
     "url": "https://benholmen.com/rss.xml"
+  },
+  {
+    "name": "Thoughts from Eric",
+    "url": "https://meyerweb.com/eric/thoughts/feed/"
   }
 ]
