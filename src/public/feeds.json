@@ -430,5 +430,9 @@
   {
     "name": "Thoughts from Eric",
     "url": "https://meyerweb.com/eric/thoughts/feed/"
+  },
+  {
+    "name": "Codrops",
+    "url": "https://tympanus.net/codrops/feed/"
   }
 ]
