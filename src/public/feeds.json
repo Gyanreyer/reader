@@ -434,5 +434,9 @@
   {
     "name": "Codrops",
     "url": "https://tympanus.net/codrops/feed/"
+  },
+  {
+    "name": "Stefan Judis",
+    "url": "https://www.stefanjudis.com/rss.xml"
   }
 ]
