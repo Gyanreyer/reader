@@ -31,10 +31,6 @@
         --clr-dark: #3f3b33;
         --clr-light: #fffcf5;
       }
-
-      im-port {
-        display: none;
-      }
     </style>
   </body>
 </html>

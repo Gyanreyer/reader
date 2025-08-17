@@ -278,7 +278,7 @@ export default class ArticleListItem extends LitElement {
     }
 
     db.articles.update(this._article.url, {
-      read: /** @type {0 | 1} */ (this._article.read ^ 1),
+      read: this._article.read === 0 ? 1 : 0,
     });
   }
 
@@ -320,7 +320,7 @@ export default class ArticleListItem extends LitElement {
 
     const hasThumbnail = thumbnail !== null && thumbnail !== NO_THUMBNAIL;
 
-    return html`<article data-read="${read === 1}">
+    return html`<article data-read="${read >= 1}">
       <header data-has-thumb="${hasThumbnail}">
         ${hasThumbnail
           ? html`<img
@@ -332,7 +332,7 @@ export default class ArticleListItem extends LitElement {
             />`
           : null}
         <button @click=${this._onClickToggleRead} id="toggle-read">
-          Mark as ${read === 1 ? "unread" : "read"}
+          Mark as ${read >= 1 ? "unread" : "read"}
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
             <use href="/icons.svg#visibility-on" id="icon--mark-read"></use>
             <use href="/icons.svg#visibility-off" id="icon--mark-unread"></use>

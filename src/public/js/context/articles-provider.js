@@ -113,17 +113,15 @@ export default class ArticlesProvider extends LitElement {
     if (filterFeedURL) {
       if (includeRead && includeUnread) {
         articlesCollection = db.articles
-          .where(["feedURL", "publishedAt"])
-          .between(
-            [filterFeedURL, Dexie.minKey],
-            [filterFeedURL, Dexie.maxKey]
-          );
+          .where("feedURL")
+          .equals(filterFeedURL);
       } else {
         articlesCollection = db.articles
-          .where(["feedURL", "read", "publishedAt"])
+          .where(["feedURL", "read"])
           .between(
-            [filterFeedURL, includeUnread ? 0 : 1, Dexie.minKey],
-            [filterFeedURL, includeRead ? 1 : 0, Dexie.maxKey]
+            [filterFeedURL, includeUnread ? 0 : 1],
+            [filterFeedURL, includeRead ? 2 : 1],
+            true, true,
           );
       }
     } else {
@@ -131,10 +129,11 @@ export default class ArticlesProvider extends LitElement {
         articlesCollection = db.articles.orderBy("publishedAt");
       } else {
         articlesCollection = db.articles
-          .where(["read", "publishedAt"])
+          .where("read")
           .between(
-            [includeUnread ? 0 : 1, Dexie.minKey],
-            [includeRead ? 1 : 0, Dexie.maxKey]
+            includeUnread ? 0 : 1,
+            includeRead ? 2 : 1,
+            true, true,
           );
       }
     }
@@ -149,13 +148,15 @@ export default class ArticlesProvider extends LitElement {
 
     const pageStartIndex = (clampedPageNumber - 1) * pageSize;
 
+    const articles = await articlesCollection
+      .offset(pageStartIndex)
+      .limit(pageSize)
+      .reverse()
+      .sortBy("publishedAt");
+
     this.updateContextValue({
-      totalArticleCount: await articlesCollection.count(),
-      articleURLs: await articlesCollection
-        .reverse()
-        .offset(pageStartIndex)
-        .limit(pageSize)
-        .primaryKeys(),
+      totalArticleCount: totalArticleCount,
+      articleURLs: articles.map((article) => article.url),
       isLoadingArticles: false,
     });
   }

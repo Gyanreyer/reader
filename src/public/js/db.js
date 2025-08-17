@@ -19,7 +19,7 @@ import { Dexie } from "/lib/dexie.js";
  *  feedURL: string;
  *  title: string | null;
  *  publishedAt: number;
- *  read: 0 | 1;
+ *  read: 0 | 1 | 2; // 0 = unread, 1 = read this session, 2 = read in a past session
  *  thumbnail: {
  *    url: string;
  *    alt: string;
@@ -60,8 +60,21 @@ db.version(3)
       .modify((article) => {
         if (article.readAt) {
           article.read =
-            article.readAt != null && article.readAt < Infinity ? 1 : 0;
+            article.readAt != null && article.readAt < Infinity ? 2 : 0;
           delete article.readAt;
         }
       })
   );
+
+db.articles.where({
+  read: 1,
+}).primaryKeys().then((keys) => {
+  // Update all articles which were read in the last session from read: 1 to read: 2
+  // so they won't be shown unless the "include read" filter is active.
+  if (keys.length > 0) {
+    db.articles.bulkUpdate(keys.map((key) => ({
+      key,
+      changes: { read: 2 },
+    })));
+  }
+});
