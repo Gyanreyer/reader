@@ -446,5 +446,9 @@
   {
     "name": "Una Kravets Online",
     "url": "https://una.im/rss.xml"
+  },
+  {
+    "name": "Medienbäcker Thomas Günther",
+    "url": "https://medienbaecker.com/articles.xml"
   }
 ]
