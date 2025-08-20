@@ -450,5 +450,9 @@
   {
     "name": "Medienbäcker Thomas Günther",
     "url": "https://medienbaecker.com/articles.xml"
+  },
+  {
+    "name": "CSS Wizardry",
+    "url": "https://csswizardry.com/feed.xml"
   }
 ]
