@@ -29,7 +29,7 @@ export default class FiltersProvider extends LitElement {
      */
     this._contextValue = {
       includeUnread: true,
-      includeRead: true,
+      includeRead: false,
       pageNumber: getPageNumber(),
       pageSize: FiltersProvider.PAGE_SIZE,
     };
