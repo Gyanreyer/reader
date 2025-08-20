@@ -454,5 +454,9 @@
   {
     "name": "CSS Wizardry",
     "url": "https://csswizardry.com/feed.xml"
+  },
+  {
+    "name": "Hacker News",
+    "url": "https://news.ycombinator.com/rss"
   }
 ]
