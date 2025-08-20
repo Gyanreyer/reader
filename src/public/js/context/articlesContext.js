@@ -2,7 +2,11 @@ import { createContext } from "/lib/lit.js";
 
 /**
  * @typedef {{
- *  articleURLs: string[];
+ *  articleURLs: Array<({
+ *    feedURL: string;
+ *    feedTitle: string;
+ *    articleURLs: string[];
+ *  }) | string>;
  *  isLoadingArticles: boolean;
  *  totalArticleCount: number;
  *  isRefreshing: boolean;

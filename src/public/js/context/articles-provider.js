@@ -154,9 +154,42 @@ export default class ArticlesProvider extends LitElement {
       .reverse()
       .sortBy("publishedAt");
 
+    /**
+     * @type {Array<({
+     *  feedURL: string;
+     *  feedTitle: string;
+     *  articleURLs: string[];
+     * }) | string>}
+     */
+    const groupedArticleURLs = [];
+    /**
+     * @type {{
+     *  [feedURL: string]: number;
+     * }}
+     */
+    const feedGroupIndices = {};
+    for (const article of articles) {
+      const feedGroupIndex = feedGroupIndices[article.feedURL];
+      if (feedGroupIndex !== undefined) {
+        if (typeof groupedArticleURLs[feedGroupIndex] === "string") {
+          const feedTitle = await db.feeds.get(article.feedURL).then(feed => feed?.title || article.feedURL);
+
+          groupedArticleURLs[feedGroupIndex] = {
+            feedURL: article.feedURL,
+            feedTitle,
+            articleURLs: [groupedArticleURLs[feedGroupIndex], article.url],
+          };
+        } else {
+          groupedArticleURLs[feedGroupIndex].articleURLs.push(article.url);
+        }
+      } else {
+        feedGroupIndices[article.feedURL] = groupedArticleURLs.push(article.url) - 1;
+      }
+    }
+
     this.updateContextValue({
       totalArticleCount: totalArticleCount,
-      articleURLs: articles.map((article) => article.url),
+      articleURLs: groupedArticleURLs,
       isLoadingArticles: false,
     });
   }

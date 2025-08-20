@@ -42,8 +42,6 @@ export default class ArticleListItem extends LitElement {
     }
 
     article {
-      --menu-button-size: 1.5rem;
-      --inline-padding: 0.75rem;
       padding: 1rem;
       background-color: var(--clr-light);
       box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.3);
@@ -54,10 +52,19 @@ export default class ArticleListItem extends LitElement {
       height: 100%;
       box-sizing: border-box;
       justify-content: end;
+      transition: background-color 0.1s;
+      container-type: inline-size;
+    }
+
+    article-list-item-group :host {
+      background-color: color-mix(in srgb, var(--clr-bg), var(--clr-light));
+    }
+
+    :host {
       transition: opacity 0.1s;
     }
 
-    article[data-read="true"] {
+    :host([data-read="true"]) {
       opacity: 0.75;
     }
 
@@ -100,11 +107,11 @@ export default class ArticleListItem extends LitElement {
       color: var(--clr-positive-action);
     }
 
-    [data-read="true"] #toggle-read {
+    :host([data-read="true"]) #toggle-read {
       color: var(--clr-negative-action);
     }
 
-    [data-read="false"] #toggle-read {
+    :host([data-read="false"]) #toggle-read {
       margin-inline-start: 2.2ch;
     }
 
@@ -122,11 +129,11 @@ export default class ArticleListItem extends LitElement {
       display: none;
     }
 
-    [data-read="false"] #icon--mark-read {
+    :host([data-read="false"]) #icon--mark-read {
       display: block;
     }
 
-    [data-read="true"] #icon--mark-unread {
+    :host([data-read="true"]) #icon--mark-unread {
       display: block;
     }
 
@@ -190,6 +197,57 @@ export default class ArticleListItem extends LitElement {
       width: 1.4em;
       margin-inline: 0.2em;
     }
+
+    :host([data-compact][data-read="true"]) article {
+      background-color: color(from var(--clr-bg) srgb r g b / 0.35);
+    }
+
+    :host([data-compact]) #thumbnail {
+      max-width: min(50cqw, 180px);
+      max-height: 100px;
+      margin-block-end: auto;
+    }
+
+    @container (width >= 600px) {
+      :host([data-compact]) header {
+        display: flex;
+
+        #thumbnail {
+          order: 1;
+        }
+
+        h2 {
+          order: 2;
+          flex: 1;
+        }
+
+        #toggle-read {
+          order: 3;
+          margin-inline-start: auto;
+          margin-block-start: 0.35rem;
+        }
+      }
+    }
+
+    :host([data-compact]) #article-info {
+      display: flex;
+      gap: 0;
+
+      #author {
+        display: none;
+      }
+
+      p {
+        font-size: clamp(0.75rem, 1cqw, 0.9rem);
+        padding-inline-end: 0.75em;
+        margin-inline-end: 0.75em;
+        border-inline-end: 1px solid color(from var(--clr-dark) srgb r g b / 0.25);
+      }
+
+      p:last-child {
+        border-inline-end: none;
+      }
+    }
   `;
 
   static intersectionObserver = new IntersectionObserver(
@@ -245,7 +303,12 @@ export default class ArticleListItem extends LitElement {
           }
         });
       }
-      this._article = article ?? null;
+      if (article) {
+        this._article = article;
+        this.dataset.read = article.read >= 1 ? "true" : "false";
+      } else {
+        this._article = null;
+      }
     });
   }
 
@@ -320,17 +383,17 @@ export default class ArticleListItem extends LitElement {
 
     const hasThumbnail = thumbnail !== null && thumbnail !== NO_THUMBNAIL;
 
-    return html`<article data-read="${read >= 1}">
+    return html`<article>
       <header data-has-thumb="${hasThumbnail}">
         ${hasThumbnail
-          ? html`<img
+      ? html`<img
               id="thumbnail"
               src="${thumbnail.url}"
               alt="${thumbnail.alt}"
               loading="lazy"
               onerror="this.style.display = 'none'; this.parentElement.dataset.hasThumb = false"
             />`
-          : null}
+      : null}
         <button @click=${this._onClickToggleRead} id="toggle-read">
           Mark as ${read >= 1 ? "unread" : "read"}
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
@@ -356,7 +419,7 @@ export default class ArticleListItem extends LitElement {
         </p>
         <p id="word-count">
           ${wordCount
-            ? html`<svg
+      ? html`<svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
                   height="24"
@@ -364,11 +427,11 @@ export default class ArticleListItem extends LitElement {
                   <use href="/icons.svg#words"></use>
                 </svg>
                 ${wordCount} words`
-            : null}
+      : null}
         </p>
         <p id="reading-duration">
           ${estimatedReadingDurationMinutes
-            ? html`<svg
+      ? html`<svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
                   height="24"
@@ -377,7 +440,7 @@ export default class ArticleListItem extends LitElement {
                 </svg>
                 ${estimatedReadingDurationMinutes}
                 minute${estimatedReadingDurationMinutes === 1 ? "" : "s"}`
-            : null}
+      : null}
         </p>
       </div>
     </article>`;

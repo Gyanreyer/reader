@@ -7,22 +7,6 @@ import "./article-list-item.js";
 export default class ArticlesList extends LitElement {
   static tagName = "articles-list";
 
-  static PAGE_SIZE = 48;
-
-  static get properties() {
-    return {
-      _articleURLs: {
-        state: true,
-      },
-      _filter_IncludeUnread: {
-        state: true,
-      },
-      _includeRead: {
-        state: true,
-      },
-    };
-  }
-
   static styles = css`
     ul {
       list-style-type: none;
@@ -36,6 +20,58 @@ export default class ArticlesList extends LitElement {
     refresh-button {
       position: sticky;
       inset-block-start: 0rem;
+    }
+
+    .article-list-item-group {
+      background-color: var(--clr-light);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      opacity: 0.75;
+      transition: opacity 0.1s;
+    }
+
+    .article-list-item-group:has([data-read="false"]) {
+      opacity: 1;
+    }
+    
+    .article-list-item-group summary {
+      cursor: pointer;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .article-list-item-group summary p {
+      font-size: 0.875rem;
+      margin-block: 0;
+      margin-inline-start: auto;
+    }
+
+    .article-list-item-group summary:before {
+      /** Right black arrow */
+      content: '\\25B8';
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .article-list-item-group[open] summary:before {
+      /** Down black arrow */
+      content: '\\25BE';
+    }
+
+    .article-list-item-group ul {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+
+    .article-list-item-group h3 {
+      margin: 0;
+      font-size: inherit;
+      color: var(--clr-text);
+      display: inline;
     }
   `;
 
@@ -67,13 +103,26 @@ export default class ArticlesList extends LitElement {
     return html`
       <ul>
         ${repeat(
-          articleURLs,
-          (url) => url,
-          (url) =>
-            html`<li>
-              <article-list-item url=${url}></article-list-item>
-            </li>`
-        )}
+      articleURLs,
+      (articleURLOrGroup) => typeof articleURLOrGroup === "string" ? articleURLOrGroup : articleURLOrGroup.feedURL,
+      (articleURLOrGroup) =>
+        html`<li>
+          ${typeof articleURLOrGroup === "string" ?
+            html`<article-list-item url=${articleURLOrGroup}></article-list-item>` :
+            html`<details open class="article-list-item-group">
+              <summary>
+                <h3>${articleURLOrGroup.feedTitle}</h3>
+                <p>${articleURLOrGroup.articleURLs.length} articles</p>
+              </summary>
+              <ul>
+                ${repeat(articleURLOrGroup.articleURLs,
+              (url) => url, (url) =>
+              html`<li><article-list-item url=${url} data-compact></article-list-item></li>`
+            )}
+              </ul>
+            </details>`}
+        </li>`
+    )}
       </ul>
     `;
   }
