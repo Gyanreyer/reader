@@ -458,5 +458,9 @@
   {
     "name": "Hacker News",
     "url": "https://news.ycombinator.com/rss"
+  },
+  {
+    "name": "Josh Comeau's blog",
+    "url": "https://www.joshwcomeau.com/rss.xml"
   }
 ]
