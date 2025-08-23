@@ -462,5 +462,9 @@
   {
     "name": "Josh Comeau's blog",
     "url": "https://www.joshwcomeau.com/rss.xml"
+  },
+  {
+    "name": "Muffinman",
+    "url": "https://muffinman.io/atom.xml"
   }
 ]
