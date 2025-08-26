@@ -46,6 +46,7 @@ export default class ArticlesList extends LitElement {
       font-size: 0.875rem;
       margin-block: 0;
       margin-inline-start: auto;
+      white-space: nowrap;
     }
 
     .article-list-item-group summary:before {
