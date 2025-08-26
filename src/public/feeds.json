@@ -466,5 +466,9 @@
   {
     "name": "Muffinman",
     "url": "https://muffinman.io/atom.xml"
+  },
+  {
+    "name": "Rendezvous with Cassidoo",
+    "url": "https://buttondown.email/cassidoo/rss"
   }
 ]
