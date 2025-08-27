@@ -1,4 +1,4 @@
-import { css, html, LitElement, ContextConsumer } from "/lib/lit.js";
+import { css, html, LitElement, repeat, ContextConsumer } from "/lib/lit.js";
 
 import { articlesContext } from "/js/context/articlesContext.js";
 
@@ -103,8 +103,10 @@ export default class ArticlesList extends LitElement {
 
     return html`
       <ul>
-        ${articleURLs.map((articleURLOrGroup) =>
-          html`<li>
+        ${repeat(articleURLs,
+      (articleURLsOrGroup) => typeof articleURLsOrGroup === "string" ? `article/${articleURLsOrGroup}` : `group/${articleURLsOrGroup.feedURL}/${articleURLsOrGroup.articleURLs.join("-")}`,
+      (articleURLOrGroup) =>
+        html`<li>
           ${typeof articleURLOrGroup === "string" ?
             html`<article-list-item url=${articleURLOrGroup}></article-list-item>` :
             html`<details open class="article-list-item-group">
@@ -114,8 +116,8 @@ export default class ArticlesList extends LitElement {
               </summary>
               <ul>
                 ${articleURLOrGroup.articleURLs.map(
-                  (url) =>
-              html`<li><article-list-item url=${url} data-compact></article-list-item></li>`
+              (url) =>
+                html`<li><article-list-item url=${url} data-compact></article-list-item></li>`
             )}
               </ul>
             </details>`}
