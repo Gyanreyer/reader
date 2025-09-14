@@ -482,5 +482,9 @@
   {
     "name": "Geri Reid",
     "url": "https://gerireid.com/rss.xml"
+  },
+  {
+    "name": "Adam Silver",
+    "url": "https://adamsilver.io/atom.xml"
   }
 ]
