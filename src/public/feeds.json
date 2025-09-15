@@ -486,5 +486,9 @@
   {
     "name": "Adam Silver",
     "url": "https://adamsilver.io/atom.xml"
+  },
+  {
+    "name": "Anthony Fu",
+    "url": "https://antfu.me/feed.xml"
   }
 ]
