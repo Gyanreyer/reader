@@ -490,5 +490,9 @@
   {
     "name": "Anthony Fu",
     "url": "https://antfu.me/feed.xml"
+  },
+  {
+    "name": "Jake Archibald",
+    "url": "https://jakearchibald.com/posts.rss"
   }
 ]
