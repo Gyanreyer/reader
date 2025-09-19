@@ -38,70 +38,32 @@ export async function refreshFeeds() {
   }
 
   /**
-   * @type {{
-   *  name: string;
-   *  url: string;
-   * }[]}
+   * @type {string[]}
    */
-  const feeds = await feedsResponse.json();
+  const feedURLs = await feedsResponse.json();
 
   /**
-   * @type {Map<string, { title: string; url: string }>}
+   * @type {Set<string>}
    */
-  const allFeedsMap = new Map();
-  for (const feed of feeds) {
-    allFeedsMap.set(feed.url, {
-      title: feed.name,
-      url: feed.url,
-    });
-  }
-
-  const newFeedURLsSet = new Set(allFeedsMap.keys());
+  const currentFeedURLsSet = new Set(feedURLs);
 
   await db.transaction("rw", db.feeds, db.articles, async () => {
     const existingFeedURLs = await db.feeds.toCollection().primaryKeys();
-    /**
-     * @type {string[]}
-     */
-    const feedURLsToDelete = [];
-    /**
-     * @type {string[]}
-     */
-    const feedURLsToUpdate = [];
+    const existingFeedURLsSet = new Set(existingFeedURLs);
 
-    for (const feedURL of existingFeedURLs) {
-      if (allFeedsMap.has(feedURL)) {
-        feedURLsToUpdate.push(feedURL);
-      } else {
-        feedURLsToDelete.push(feedURL);
-      }
-      newFeedURLsSet.delete(feedURL);
-    }
-
-    const feedURLsToAdd = Array.from(newFeedURLsSet);
+    // All feed URLs that exist in the current feed list bot not in the existing feed list
+    // in the DB are new and need to be added
+    const newFeedURLsToAdd = Array.from(currentFeedURLsSet.difference(existingFeedURLsSet));
+    // All feed URLs that exist in the DB but not in the current feed list need to be deleted
+    const feedURLsToDelete = Array.from(existingFeedURLsSet.difference(currentFeedURLsSet));
 
     // Write all updated feeds to the DB
     return Promise.all([
-      db.feeds.bulkUpdate(
-        feedURLsToUpdate.map((url) => {
-          const feedData = allFeedsMap.get(url);
-          if (!feedData) {
-            throw new Error(`Feed data not found for URL: ${url}`);
-          }
-          return {
-            key: url,
-            changes: feedData,
-          };
-        })
-      ),
       db.feeds.bulkPut(
-        feedURLsToAdd.map((url) => {
-          const feedData = allFeedsMap.get(url);
-          if (!feedData) {
-            throw new Error(`Feed data not found for URL: ${url}`);
-          }
+        newFeedURLsToAdd.map((url) => {
           return {
-            ...feedData,
+            url,
+            title: url,
             lastRefreshedAt: 0,
           };
         })

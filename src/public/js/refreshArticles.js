@@ -152,6 +152,11 @@ const getFormattedArticleData = ({
  * @param {Record<string, any>} feedJSON
  */
 async function processJSONFeedResponse(feedURL, feedJSON) {
+  const feedTitle = feedJSON.title?.trim();
+  if (feedTitle) {
+    await db.feeds.update(feedURL, { title: feedTitle });
+  }
+
   const items = feedJSON.items;
   if (!Array.isArray(items)) {
     throw new Error(
@@ -205,6 +210,11 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
  * @param {Document} feedDocument
  */
 async function processRSSFeedResponse(feedURL, feedDocument) {
+  const feedTitle = feedDocument.querySelector("channel > title")?.textContent.trim();
+  if (feedTitle) {
+    await db.feeds.update(feedURL, { title: feedTitle });
+  }
+
   /**
    * @type {Record<string, Article>} Parsed articles to add to the database
    */
@@ -250,6 +260,11 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
  * @param {Document} feedDocument
  */
 async function processAtomFeedResponse(feedURL, feedDocument) {
+  const feedTitle = feedDocument.querySelector("feed > title")?.textContent.trim();
+  if (feedTitle) {
+    await db.feeds.update(feedURL, { title: feedTitle });
+  }
+
   /**
    * @type {Record<string, Article>} Parsed articles to add to the database
    */
@@ -418,6 +433,8 @@ export async function refreshAllArticles({ onProgress, onComplete }) {
       );
     }
   }
+
+  window.dispatchEvent(new CustomEvent("reader:feeds-updated"));
 
   onComplete();
 }

@@ -5,8 +5,8 @@
   "description": "Custom RSS feed reader",
   "main": "index.js",
   "scripts": {
-    "build": "npx @11ty/eleventy",
-    "dev": "npx concurrently 'npx @11ty/eleventy --watch' 'wrangler pages dev --live-reload'"
+    "build": "node scripts/build-feeds.js && npx @11ty/eleventy",
+    "dev": "node scripts/build-feeds.js && npx concurrently 'npx @11ty/eleventy --watch' 'wrangler pages dev --live-reload'"
   },
   "author": "Ryan Geyer",
   "license": "ISC",
