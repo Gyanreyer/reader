@@ -67,11 +67,14 @@ const getFormattedArticleData = ({
   rawThumbnailURL = null,
   rawPublishedAtTimestamp = null,
 }) => {
-  const url = rawURL?.trim();
+  let url = rawURL?.trim();
 
-  if (!url || !URL.canParse(url)) {
+  if (!url || !URL.canParse(url, feedURL)) {
     throw new Error(`Received invalid article URL: ${url}`);
   }
+
+  // Ensure the article URL is absolute
+  url = new URL(url, feedURL).toString();
 
   /**
    * @type {string | null}
@@ -105,8 +108,8 @@ const getFormattedArticleData = ({
     }
   }
 
-  if (rawThumbnailURL && URL.canParse(rawThumbnailURL)) {
-    thumbnailURL = rawThumbnailURL;
+  if (rawThumbnailURL && URL.canParse(rawThumbnailURL, url)) {
+    thumbnailURL = new URL(rawThumbnailURL, url).toString();
   }
 
   if (rawContent) {
@@ -121,9 +124,8 @@ const getFormattedArticleData = ({
 
     if (!title) {
       // Grab the first 10 words of the content text to use as a placeholder title
-      title = `${words.slice(0, 10).join(" ")}${
-        words.length > 10 ? "..." : ""
-      }`;
+      title = `${words.slice(0, 10).join(" ")}${words.length > 10 ? "..." : ""
+        }`;
     }
   }
 
@@ -139,9 +141,9 @@ const getFormattedArticleData = ({
     publishedAt,
     thumbnail: thumbnailURL
       ? {
-          url: thumbnailURL,
-          alt: "",
-        }
+        url: thumbnailURL,
+        alt: "",
+      }
       : null,
     read: 0,
   };

@@ -72,7 +72,7 @@ export async function getMetadataForURL(url) {
     ?.getAttribute("content")
     ?.trim();
 
-  if (ogImageURL && URL.canParse(ogImageURL)) {
+  if (ogImageURL && URL.canParse(ogImageURL, url)) {
     thumbnailURL = ogImageURL;
   }
 
@@ -86,9 +86,9 @@ export async function getMetadataForURL(url) {
     title,
     thumbnail: thumbnailURL
       ? {
-          url: thumbnailURL,
-          alt: thumbnailImageAlt,
-        }
+        url: thumbnailURL,
+        alt: thumbnailImageAlt,
+      }
       : null,
   };
 }
