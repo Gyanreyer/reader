@@ -7,6 +7,9 @@ import { proxiedFetch } from "./utils/proxiedFetch.js";
  * @import { Article } from './db.js';
  */
 
+// Timestamp to use for all newly discovered articles from this refresh
+const discoveredAt = Date.now();
+
 const domParser = new DOMParser();
 
 /**
@@ -139,6 +142,7 @@ const getFormattedArticleData = ({
     title,
     wordCount,
     publishedAt,
+    discoveredAt,
     thumbnail: thumbnailURL
       ? {
         url: thumbnailURL,

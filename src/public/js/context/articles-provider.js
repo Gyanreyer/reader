@@ -126,7 +126,7 @@ export default class ArticlesProvider extends LitElement {
       }
     } else {
       if (includeRead && includeUnread) {
-        articlesCollection = db.articles.orderBy("publishedAt");
+        articlesCollection = db.articles.orderBy(["discoveredAt", "publishedAt"]);
       } else {
         articlesCollection = db.articles
           .where("read")

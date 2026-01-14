@@ -19,6 +19,7 @@ import { Dexie } from "/lib/dexie.js";
  *  feedURL: string;
  *  title: string | null;
  *  publishedAt: number;
+ *  discoveredAt: number; // The timestamp when the article was first discovered
  *  read: 0 | 1 | 2; // 0 = unread, 1 = read this session, 2 = read in a past session
  *  thumbnail: {
  *    url: string;
@@ -49,8 +50,12 @@ db.version(3)
     feeds: "url, title",
     // We have various combinations of compound indexes to support different
     // types of queries depending on the filters applied.
+    // When in a mixed feed, we want to order articles by their publish date, but will also want to sort by
+    // their "discovered at" date first to ensure that newly discovered articles with stale publish dates are
+    // still surfaced appropriately.
+    // discoveredAt is not as useful useful when filtering on a single feed, so we omit it from single-feed indices.
     articles:
-      "url, publishedAt, [read+publishedAt], [feedURL+read+publishedAt], [feedURL+publishedAt]",
+      "url, [discoveredAt+publishedAt], [read+discoveredAt+publishedAt], [feedURL+read+publishedAt], [feedURL+publishedAt]",
     settings: "name",
   })
   .upgrade(async (tx) =>
@@ -62,6 +67,9 @@ db.version(3)
           article.read =
             article.readAt != null && article.readAt < Infinity ? 2 : 0;
           delete article.readAt;
+        }
+        if (!article.discoveredAt) {
+          article.discoveredAt = article.publishedAt ?? Date.now();
         }
       })
   );
