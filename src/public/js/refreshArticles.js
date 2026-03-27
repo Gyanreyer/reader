@@ -58,6 +58,7 @@ const WHITE_SPACE_REGEX = /\s+/;
  *  rawContent?: string | null;
  *  rawThumbnailURL?: string | null;
  *  rawPublishedAtTimestamp?: string | null;
+ *  isFirstFetch?: boolean;
  * }} data
  *
  * @returns {Article}
@@ -69,6 +70,7 @@ const getFormattedArticleData = ({
   rawContent = null,
   rawThumbnailURL = null,
   rawPublishedAtTimestamp = null,
+  isFirstFetch = false,
 }) => {
   let url = rawURL?.trim();
 
@@ -142,7 +144,7 @@ const getFormattedArticleData = ({
     title,
     wordCount,
     publishedAt,
-    discoveredAt,
+    discoveredAt: isFirstFetch ? (publishedAt || discoveredAt) : discoveredAt,
     thumbnail: thumbnailURL
       ? {
         url: thumbnailURL,
@@ -156,8 +158,9 @@ const getFormattedArticleData = ({
 /**
  * @param {string} feedURL
  * @param {Record<string, any>} feedJSON
+ * @param {boolean} isFirstFetch
  */
-async function processJSONFeedResponse(feedURL, feedJSON) {
+async function processJSONFeedResponse(feedURL, feedJSON, isFirstFetch) {
   const feedTitle = feedJSON.title?.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -195,6 +198,7 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
              */
             (attachment) => attachment.mime_type?.startsWith("image")
           )?.url,
+        isFirstFetch,
       });
       parsedArticles[article.url] = article;
     } catch (e) {
@@ -214,8 +218,9 @@ async function processJSONFeedResponse(feedURL, feedJSON) {
  *
  * @param {string} feedURL
  * @param {Document} feedDocument
+ * @param {boolean} isFirstFetch
  */
-async function processRSSFeedResponse(feedURL, feedDocument) {
+async function processRSSFeedResponse(feedURL, feedDocument, isFirstFetch) {
   const feedTitle = feedDocument.querySelector("channel > title")?.textContent.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -246,6 +251,7 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
             .getElementsByTagName("media:thumbnail")?.[0]
             ?.getAttribute("url") ||
           item.querySelector("enclosure[type^=image]")?.getAttribute("url"),
+        isFirstFetch,
       });
 
       parsedArticles[article.url] = article;
@@ -264,8 +270,9 @@ async function processRSSFeedResponse(feedURL, feedDocument) {
 /**
  * @param {string} feedURL
  * @param {Document} feedDocument
+ * @param {boolean} isFirstFetch
  */
-async function processAtomFeedResponse(feedURL, feedDocument) {
+async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
   const feedTitle = feedDocument.querySelector("feed > title")?.textContent.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -294,6 +301,7 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
         rawThumbnailURL: entry
           .getElementsByTagName("media:thumbnail")?.[0]
           ?.getAttribute("url"),
+        isFirstFetch,
       });
       parsedArticles[article.url] = article;
     } catch (e) {
@@ -315,6 +323,8 @@ async function processAtomFeedResponse(feedURL, feedDocument) {
  * @returns {Promise<number>} The number of new articles that were added to the database
  */
 export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
+  const isFirstFetch = (feed.lastRefreshedAt ?? 0) === 0;
+
   if (!shouldForceRefresh) {
     const refreshInterval = await settings.get("articleRefreshInterval");
     const lastRefreshedAt = feed.lastRefreshedAt ?? 0;
@@ -363,16 +373,18 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     case "application/atom+xml":
       return processAtomFeedResponse(
         feed.url,
-        domParser.parseFromString(feedText, "application/xml")
+        domParser.parseFromString(feedText, "application/xml"),
+        isFirstFetch
       );
     case "application/rss+xml":
       return processRSSFeedResponse(
         feed.url,
-        domParser.parseFromString(feedText, "application/xml")
+        domParser.parseFromString(feedText, "application/xml"),
+        isFirstFetch
       );
     case "application/feed+json":
     case "application/json":
-      return processJSONFeedResponse(feed.url, JSON.parse(feedText));
+      return processJSONFeedResponse(feed.url, JSON.parse(feedText), isFirstFetch);
   }
 
   // If we're at this point, we've received an unrecognized content type. Let's see if we can figure it out.
@@ -387,7 +399,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     }
 
     if (feedJSON) {
-      return processJSONFeedResponse(feed.url, feedJSON);
+      return processJSONFeedResponse(feed.url, feedJSON, isFirstFetch);
     }
   }
 
@@ -398,9 +410,9 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     rootElement.tagName === "feed" &&
     rootElement.namespaceURI === "http://www.w3.org/2005/Atom"
   ) {
-    return processAtomFeedResponse(feed.url, feedDocument);
+    return processAtomFeedResponse(feed.url, feedDocument, isFirstFetch);
   } else if (rootElement.tagName === "rss") {
-    return processRSSFeedResponse(feed.url, feedDocument);
+    return processRSSFeedResponse(feed.url, feedDocument, isFirstFetch);
   } else {
     throw new Error(
       `Received unrecognized XML feed format for feed URL ${feed.url}`
