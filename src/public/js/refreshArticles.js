@@ -1,10 +1,11 @@
 import { db } from "./db.js";
 import { refreshFeeds } from "./refreshFeeds.js";
 import { settings } from "./settings.js";
+import { enqueueForHost, getHostKey } from "./utils/hostQueue.js";
 import { proxiedFetch } from "./utils/proxiedFetch.js";
 
 /**
- * @import { Article } from './db.js';
+ * @import { Article, Feed } from './db.js';
  */
 
 // Timestamp to use for all newly discovered articles from this refresh
@@ -376,14 +377,18 @@ async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
 export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
   const isFirstFetch = (feed.lastRefreshedAt ?? 0) === 0;
 
+  const refreshInterval = await settings.get("articleRefreshInterval");
+
   if (!shouldForceRefresh) {
-    const refreshInterval = await settings.get("articleRefreshInterval");
-    const lastRefreshedAt = feed.lastRefreshedAt ?? 0;
-    // If less time has elapsed since last refresh than the refresh interval, don't refresh
-    if (Date.now() - lastRefreshedAt <= refreshInterval) {
+    // Feeds fetched before we stored nextRefreshAt are due one refresh interval after their last refresh
+    const nextRefreshAt =
+      feed.nextRefreshAt ?? (feed.lastRefreshedAt ?? 0) + refreshInterval;
+    if (Date.now() < nextRefreshAt) {
       return 0;
     }
   }
+
+  const nextRefreshAt = Date.now() + refreshInterval;
 
   const headers = new Headers({
     "If-None-Match": feed.etag ?? "",
@@ -399,6 +404,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     // The feed is unchanged, no need to update the database
     db.feeds.update(feed.url, {
       lastRefreshedAt: Date.now(),
+      nextRefreshAt,
     });
     return 0;
   }
@@ -406,6 +412,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
   if (!feedResponse.ok) {
     db.feeds.update(feed.url, {
       lastRefreshedAt: Date.now(),
+      nextRefreshAt,
     });
     throw new Error(
       `Unable to refresh feed articles: received ${feedResponse.status} ${feedResponse.statusText} response from feed URL ${feed.url}`
@@ -416,6 +423,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     etag: feedResponse.headers.get("Etag"),
     lastModified: feedResponse.headers.get("Last-Modified"),
     lastRefreshedAt: Date.now(),
+    nextRefreshAt,
   });
 
   const feedText = await feedResponse.text();
@@ -471,6 +479,8 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
   }
 }
 
+const MAX_CONCURRENT_FEED_REFRESHES = 6;
+
 /**
  * @param {object} callbacks
  * @param {(progress: number, hasNewArticles: boolean)=>void} callbacks.onProgress
@@ -486,22 +496,40 @@ export async function refreshAllArticles({ onProgress, onComplete }) {
 
   let refreshedFeedCount = 0;
 
-  const results = await Promise.allSettled(
-    feeds.map(async (feed) => {
-      const newArticlesCount = await refreshArticlesForFeed(feed);
-      onProgress(++refreshedFeedCount / feedCount, newArticlesCount > 0);
-    })
+  // Each host's feeds are refreshed one at a time, so we never fetch more than one feed from a host at once
+  const hostFeedQueues = Array.from(
+    Map.groupBy(feeds, (feed) =>
+      URL.canParse(feed.url) ? getHostKey(feed.url) : feed.url
+    ).values()
   );
 
-  for (let i = 0, numResults = results.length; i < numResults; ++i) {
-    const result = results[i];
-    if (result.status === "rejected") {
-      console.error(
-        `Failed to refresh articles for feed ${feeds[i]}:`,
-        result.reason
-      );
+  const refreshNextHostFeeds = async () => {
+    /**
+     * @type {Feed[] | undefined}
+     */
+    let hostFeeds;
+    while ((hostFeeds = hostFeedQueues.shift())) {
+      for (const feed of hostFeeds) {
+        let newArticlesCount = 0;
+        try {
+          // Also queue with this host's article page fetches, so we don't fetch a feed and an article at the same time
+          newArticlesCount = await enqueueForHost(feed.url, () =>
+            refreshArticlesForFeed(feed)
+          );
+        } catch (e) {
+          console.error(`Failed to refresh articles for feed ${feed.url}:`, e);
+        }
+        onProgress(++refreshedFeedCount / feedCount, newArticlesCount > 0);
+      }
     }
-  }
+  };
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(MAX_CONCURRENT_FEED_REFRESHES, hostFeedQueues.length) },
+      refreshNextHostFeeds
+    )
+  );
 
   window.dispatchEvent(new CustomEvent("reader:feeds-updated"));
 

@@ -8,6 +8,7 @@ import { Dexie } from "/lib/dexie.js";
  *  url: string;
  *  title: string;
  *  lastRefreshedAt: number | null;
+ *  nextRefreshAt?: number | null; // The earliest time the feed should be fetched again
  *  etag?: string | null;
  *  lastModified?: string | null;
  * }} Feed
