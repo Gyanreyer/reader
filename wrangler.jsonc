@@ -3,7 +3,7 @@
   "pages_build_output_dir": "./_site",
   "vars": {
     "ALLOWED_ORIGIN": "reader.geyer.dev",
-    "USER_AGENT": "GeyerFeedReader/1.0 (+reader.geyer.dev/bot-info)"
+    "USER_AGENT": "GeyerFeedReader/1.0 (+https://reader.geyer.dev/bot-info)"
   },
   "compatibility_date": "2025-02-04"
 }

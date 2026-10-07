@@ -104,6 +104,12 @@ const getArticleHeadResponse = async (response) => {
   });
 };
 
+const FEED_ACCEPT_HEADER =
+  "application/atom+xml, application/rss+xml, application/feed+json, application/xml;q=0.9, */*;q=0.8";
+
+const ARTICLE_PAGE_ACCEPT_HEADER =
+  "text/html, application/xhtml+xml;q=0.9, */*;q=0.8";
+
 const MAX_REDIRECTS = 10;
 
 // Tells the client the URL that a proxied URL has permanently moved to
@@ -280,17 +286,28 @@ export const onRequest = async (context) => {
     return cachedResponse;
   }
 
+  // Anything that isn't a feed is an article page
+  const isFeedRequest = allowedFeedURLs.has(proxyURL);
+
+  const proxyRequestHeaders = new Headers({
+    Accept: isFeedRequest ? FEED_ACCEPT_HEADER : ARTICLE_PAGE_ACCEPT_HEADER,
+    "User-Agent": context.env.USER_AGENT,
+  });
+
+  // Only forward conditional headers that the client actually sent
   const requestEtag = context.request.headers.get("If-None-Match");
+  if (requestEtag) {
+    proxyRequestHeaders.set("If-None-Match", requestEtag);
+  }
   const requestIfModifiedSince =
     context.request.headers.get("If-Modified-Since");
+  if (requestIfModifiedSince) {
+    proxyRequestHeaders.set("If-Modified-Since", requestIfModifiedSince);
+  }
 
   const proxyRequest = new Request(proxyURL, {
     method: "GET",
-    headers: new Headers({
-      "If-None-Match": requestEtag,
-      "If-Modified-Since": requestIfModifiedSince,
-      "User-Agent": context.env.USER_AGENT,
-    }),
+    headers: proxyRequestHeaders,
   });
 
   let proxiedResponse = await getProxiedResponse(
@@ -298,7 +315,7 @@ export const onRequest = async (context) => {
     responseHeaders
   );
 
-  if (!allowedFeedURLs.has(proxyURL)) {
+  if (!isFeedRequest) {
     // Anything that isn't a feed is an article page
     proxiedResponse = await getArticleHeadResponse(proxiedResponse);
   }

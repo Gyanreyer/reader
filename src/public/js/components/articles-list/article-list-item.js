@@ -395,6 +395,7 @@ export default class ArticleListItem extends LitElement {
               src="${thumbnail.url}"
               alt="${thumbnail.alt}"
               loading="lazy"
+              referrerpolicy="no-referrer"
               onerror="this.style.display = 'none'; this.parentElement.dataset.hasThumb = false"
             />`
       : null}

@@ -686,10 +686,13 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     (await db.articles.where("feedURL").equals(feed.url).limit(1).count()) ===
     0;
 
-  const headers = new Headers({
-    "If-None-Match": feed.etag ?? "",
-    "If-Modified-Since": feed.lastModified ?? "",
-  });
+  const headers = new Headers();
+  if (feed.etag) {
+    headers.set("If-None-Match", feed.etag);
+  }
+  if (feed.lastModified) {
+    headers.set("If-Modified-Since", feed.lastModified);
+  }
 
   try {
     const feedResponse = await proxiedFetch(feed.url, {
