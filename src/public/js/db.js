@@ -9,6 +9,7 @@ import { Dexie } from "/lib/dexie.js";
  *  title: string;
  *  lastRefreshedAt: number | null;
  *  nextRefreshAt?: number | null; // The earliest time the feed should be fetched again
+ *  refreshHint?: number | null; // How often the publisher suggests fetching the feed, in milliseconds
  *  etag?: string | null;
  *  lastModified?: string | null;
  *  failureCount?: number; // The number of consecutive failed fetches, which determines how long we back off for

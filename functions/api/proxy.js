@@ -109,6 +109,9 @@ const MAX_REDIRECTS = 10;
 // Tells the client the URL that a proxied URL has permanently moved to
 const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
 
+// Cached responses have their Cache-Control replaced with the proxy cache's own, so the publisher's is kept here
+const ORIGINAL_CACHE_CONTROL_HEADER = "X-Proxy-Original-Cache-Control";
+
 /**
  * Fetches a request, following redirects ourselves so we can tell when a URL has permanently moved.
  *
@@ -304,6 +307,11 @@ export const onRequest = async (context) => {
     // Write the proxied response to the cache; it will expire in 1 hour.
     // For article pages, this is only the page's <head>.
     cachedResponse = proxiedResponse.clone();
+    // Keep the publisher's Cache-Control so the client can still use it as a refresh hint
+    cachedResponse.headers.set(
+      ORIGINAL_CACHE_CONTROL_HEADER,
+      proxiedResponse.headers.get("Cache-Control") ?? ""
+    );
     cachedResponse.headers.set("Cache-Control", "max-age=3600");
     await cache.put(proxyURL, cachedResponse);
   }

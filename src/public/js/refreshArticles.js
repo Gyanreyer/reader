@@ -369,6 +369,103 @@ async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
   return updateSavedArticles(parsedArticles);
 }
 
+// The proxy sets this header when the feed URL permanently redirects to a new URL
+const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
+
+// The proxy sets this header to the publisher's Cache-Control when serving a response from its own cache
+const ORIGINAL_CACHE_CONTROL_HEADER = "X-Proxy-Original-Cache-Control";
+
+// Publishers' refresh hints can lengthen a feed's refresh interval up to this limit
+const MAX_REFRESH_HINT_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+
+const SYNDICATION_NAMESPACE = "http://purl.org/rss/1.0/modules/syndication/";
+
+const ONE_HOUR = 60 * 60 * 1000;
+
+/**
+ * @type {Record<string, number>}
+ */
+const SYNDICATION_UPDATE_PERIODS = {
+  hourly: ONE_HOUR,
+  daily: 24 * ONE_HOUR,
+  weekly: 7 * 24 * ONE_HOUR,
+  monthly: 30 * 24 * ONE_HOUR,
+  yearly: 365 * 24 * ONE_HOUR,
+};
+
+/**
+ * Gets how often an RSS/Atom feed says it should be fetched, from RSS <ttl> or
+ * the syndication module's <sy:updatePeriod> and <sy:updateFrequency>.
+ *
+ * @param {Document} feedDocument
+ * @returns {number | null} The suggested interval in milliseconds, or null if the feed doesn't suggest one
+ */
+function getFeedDocumentRefreshHint(feedDocument) {
+  /**
+   * @type {number[]}
+   */
+  const hints = [];
+
+  const ttlMinutes = Number(
+    feedDocument.querySelector("channel > ttl")?.textContent?.trim() || NaN
+  );
+  if (ttlMinutes > 0) {
+    hints.push(ttlMinutes * 60 * 1000);
+  }
+
+  const updatePeriod = feedDocument
+    .getElementsByTagNameNS(SYNDICATION_NAMESPACE, "updatePeriod")[0]
+    ?.textContent?.trim()
+    .toLowerCase();
+  const updateFrequency = Number(
+    feedDocument
+      .getElementsByTagNameNS(SYNDICATION_NAMESPACE, "updateFrequency")[0]
+      ?.textContent?.trim() || NaN
+  );
+  if (updatePeriod || updateFrequency) {
+    // The spec defaults to updating once a day
+    const period = SYNDICATION_UPDATE_PERIODS[updatePeriod || "daily"];
+    const frequency = updateFrequency > 0 ? updateFrequency : 1;
+    if (period) {
+      hints.push(period / frequency);
+    }
+  }
+
+  return hints.length > 0 ? Math.max(...hints) : null;
+}
+
+/**
+ * Gets how long a feed's response says it can be cached for, from its Cache-Control or Expires headers.
+ *
+ * @param {Response} response
+ * @returns {number | null} The suggested interval in milliseconds, or null if the response doesn't suggest one
+ */
+function getResponseRefreshHint(response) {
+  const { headers } = response;
+
+  // The proxy keeps the publisher's Cache-Control here when it serves a response from its own cache
+  const cacheControl = headers.has(ORIGINAL_CACHE_CONTROL_HEADER)
+    ? headers.get(ORIGINAL_CACHE_CONTROL_HEADER)
+    : headers.get("Cache-Control");
+
+  const maxAgeMatch = cacheControl?.match(/(?:^|,)\s*max-age\s*=\s*"?(\d+)/i);
+  if (maxAgeMatch) {
+    // max-age takes precedence over Expires
+    return Number(maxAgeMatch[1]) * 1000;
+  }
+
+  const expires = Date.parse(headers.get("Expires") ?? "");
+  if (!Number.isNaN(expires)) {
+    const responseDate = Date.parse(headers.get("Date") ?? "");
+    return Math.max(
+      0,
+      expires - (Number.isNaN(responseDate) ? Date.now() : responseDate)
+    );
+  }
+
+  return null;
+}
+
 /**
  * Parses a feed's response and saves its articles.
  *
@@ -377,53 +474,94 @@ async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
  * @param {string | null} contentType
  * @param {boolean} isFirstFetch
  *
- * @returns {Promise<number>} The number of new articles that were added to the database
+ * @returns {Promise<{
+ *  newArticlesCount: number;
+ *  refreshHint: number | null;
+ * }>} The number of new articles that were added to the database, and how often the feed suggests it should be fetched
  */
 async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
-  switch (contentType) {
-    case "application/atom+xml":
-      return processAtomFeedResponse(
-        feedURL,
-        domParser.parseFromString(feedText, "application/xml"),
-        isFirstFetch
-      );
-    case "application/rss+xml":
-      return processRSSFeedResponse(
-        feedURL,
-        domParser.parseFromString(feedText, "application/xml"),
-        isFirstFetch
-      );
-    case "application/feed+json":
-    case "application/json":
-      return processJSONFeedResponse(feedURL, JSON.parse(feedText), isFirstFetch);
-  }
+  /**
+   * @type {Record<string, any> | null}
+   */
+  let feedJSON = null;
 
-  // If we're at this point, we've received an unrecognized content type. Let's see if we can figure it out.
-
-  // If the feed looks like JSON, try parsing it as JSON
-  if (feedText.startsWith("{") && feedText.endsWith("}")) {
-    let feedJSON;
+  if (
+    contentType === "application/feed+json" ||
+    contentType === "application/json"
+  ) {
+    feedJSON = JSON.parse(feedText);
+  } else if (
+    contentType !== "application/atom+xml" &&
+    contentType !== "application/rss+xml" &&
+    feedText.startsWith("{") &&
+    feedText.endsWith("}")
+  ) {
+    // We've received an unrecognized content type, but the feed looks like JSON, so try parsing it as JSON
     try {
       feedJSON = JSON.parse(feedText);
     } catch {
       // Swallow JSON parsing errors
     }
-
-    if (feedJSON) {
-      return processJSONFeedResponse(feedURL, feedJSON, isFirstFetch);
-    }
   }
 
-  // Attempt to parse the feed as XML and determine if it's an Atom or RSS feed
+  if (feedJSON) {
+    return {
+      newArticlesCount: await processJSONFeedResponse(
+        feedURL,
+        feedJSON,
+        isFirstFetch
+      ),
+      // JSON Feed has no way to suggest how often to fetch it
+      refreshHint: null,
+    };
+  }
+
   const feedDocument = domParser.parseFromString(feedText, "application/xml");
+  const refreshHint = getFeedDocumentRefreshHint(feedDocument);
+
+  if (contentType === "application/atom+xml") {
+    return {
+      newArticlesCount: await processAtomFeedResponse(
+        feedURL,
+        feedDocument,
+        isFirstFetch
+      ),
+      refreshHint,
+    };
+  } else if (contentType === "application/rss+xml") {
+    return {
+      newArticlesCount: await processRSSFeedResponse(
+        feedURL,
+        feedDocument,
+        isFirstFetch
+      ),
+      refreshHint,
+    };
+  }
+
+  // If we're at this point, we've received an unrecognized content type, so determine if it's an Atom or RSS feed
   const rootElement = feedDocument.documentElement;
   if (
     rootElement.tagName === "feed" &&
     rootElement.namespaceURI === "http://www.w3.org/2005/Atom"
   ) {
-    return processAtomFeedResponse(feedURL, feedDocument, isFirstFetch);
+    return {
+      newArticlesCount: await processAtomFeedResponse(
+        feedURL,
+        feedDocument,
+        isFirstFetch
+      ),
+      refreshHint,
+    };
   } else if (rootElement.tagName === "rss") {
-    return processRSSFeedResponse(feedURL, feedDocument, isFirstFetch);
+    return {
+      newArticlesCount: await processRSSFeedResponse(
+        feedURL,
+        feedDocument,
+        isFirstFetch
+      ),
+      refreshHint,
+    };
   } else {
     throw new Error(
       `Received unrecognized XML feed format for feed URL ${feedURL}`
@@ -431,15 +569,12 @@ async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
   }
 }
 
-
 // A feed is dead after this many consecutive 404 Not Found responses
 const MAX_NOT_FOUND_COUNT = 5;
 
 // Backoff after consecutive failures doubles each time, up to this limit
 const MAX_BACKOFF_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 1 week
 
-// The proxy sets this header when the feed URL permanently redirects to a new URL
-const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
 
 /**
  * Thrown when a feed's response has an error status.
@@ -574,27 +709,48 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
      */
     const changes = {
       lastRefreshedAt: Date.now(),
-      nextRefreshAt: Date.now() + refreshInterval,
       failureCount: 0,
       notFoundCount: 0,
       notFoundSince: null,
       movedTo: feedResponse.headers.get(PERMANENT_REDIRECT_HEADER),
     };
 
+    const responseRefreshHint = getResponseRefreshHint(feedResponse);
+
     // A 304 means the feed is unchanged, so there's nothing to process
-    if (feedResponse.status !== 304) {
-      newArticlesCount = await processFeedText(
+    if (feedResponse.status === 304) {
+      // 304 responses may not repeat the full response's headers, so keep the hint we already have unless they do
+      if (responseRefreshHint !== null) {
+        changes.refreshHint = responseRefreshHint;
+      }
+    } else {
+      const processedFeed = await processFeedText(
         feed.url,
         await feedResponse.text(),
         feedResponse.headers.get("content-type"),
         isFirstFetch
       );
+      newArticlesCount = processedFeed.newArticlesCount;
+
+      const hints = [responseRefreshHint, processedFeed.refreshHint].filter(
+        (hint) => hint !== null
+      );
+      changes.refreshHint = hints.length > 0 ? Math.max(...hints) : null;
 
       // Only save these once the articles are saved, so a failure to process the feed doesn't
       // leave us with conditional headers that would skip over the articles we missed
       changes.etag = feedResponse.headers.get("Etag");
       changes.lastModified = feedResponse.headers.get("Last-Modified");
     }
+
+    const refreshHint =
+      changes.refreshHint !== undefined ? changes.refreshHint : feed.refreshHint;
+    // Publishers' hints can only lengthen the interval, never shorten it
+    const feedRefreshInterval = Math.max(
+      refreshInterval,
+      Math.min(refreshHint ?? 0, MAX_REFRESH_HINT_INTERVAL)
+    );
+    changes.nextRefreshAt = Date.now() + feedRefreshInterval;
 
     await db.feeds.update(feed.url, changes);
 
