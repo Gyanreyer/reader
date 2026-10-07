@@ -1,7 +1,7 @@
 import { css, html, LitElement } from "/lib/lit.js";
 import { liveQuery } from "/lib/dexie.js";
 import { db } from "/js/db.js";
-import { getMetadataForURL } from "/js/getMetadataForURL.js";
+import { getMetadataForURL, HOST_UNAVAILABLE } from "/js/getMetadataForURL.js";
 
 import "../relative-date.js";
 
@@ -359,6 +359,10 @@ export default class ArticleListItem extends LitElement {
       const article = this._article;
       if (article.thumbnail === null) {
         getMetadataForURL(article.url).then((metadata) => {
+          if (metadata === HOST_UNAVAILABLE) {
+            // Leave the thumbnail unset so we try again once the host is available
+            return;
+          }
           db.articles.update(article.url, {
             thumbnail: metadata?.thumbnail ?? NO_THUMBNAIL,
           });

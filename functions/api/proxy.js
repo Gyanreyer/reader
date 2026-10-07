@@ -43,6 +43,67 @@ const isAllowedProxyURL = (proxyURL) => {
   );
 };
 
+// Stop reading an article page if we haven't found the end of its <head> after this many characters
+const MAX_ARTICLE_HEAD_LENGTH = 512 * 1024;
+
+const END_OF_HEAD_REGEX = /<\/head/i;
+
+/**
+ * Article pages are only fetched for the metadata in their <head>, so we stop reading at </head>
+ * and cancel the rest of the download.
+ *
+ * @param {Response} response
+ * @returns {Promise<Response>}
+ */
+const getArticleHeadResponse = async (response) => {
+  if (!response.body) {
+    return response;
+  }
+
+  let head = "";
+
+  if (response.headers.get("Content-Type")?.includes("html")) {
+    const reader = response.body
+      .pipeThrough(new TextDecoderStream())
+      .getReader();
+
+    while (head.length < MAX_ARTICLE_HEAD_LENGTH) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      // Start searching a little before the new chunk in case "</head" is split across chunks
+      const searchStartIndex = Math.max(0, head.length - "</head".length);
+      head += value;
+
+      const endOfHeadIndex = head
+        .slice(searchStartIndex)
+        .search(END_OF_HEAD_REGEX);
+      if (endOfHeadIndex >= 0) {
+        head = head.slice(0, searchStartIndex + endOfHeadIndex);
+        break;
+      }
+    }
+
+    await reader.cancel().catch(() => {});
+  } else {
+    // There's no <head> to read in a non-HTML response
+    await response.body.cancel().catch(() => {});
+  }
+
+  const headers = new Headers(response.headers);
+  // The body has changed, so the original length and encoding no longer apply
+  headers.delete("Content-Length");
+  headers.delete("Content-Encoding");
+
+  return new Response(head, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+};
+
 /**
  * @param {Request} proxyRequest
  * @param {Headers} responseHeaders
@@ -175,13 +236,19 @@ export const onRequest = async (context) => {
     }),
   });
 
-  const proxiedResponse = await getProxiedResponse(
+  let proxiedResponse = await getProxiedResponse(
     proxyRequest,
     responseHeaders
   );
 
+  if (!allowedFeedURLs.has(proxyURL)) {
+    // Anything that isn't a feed is an article page
+    proxiedResponse = await getArticleHeadResponse(proxiedResponse);
+  }
+
   if (proxiedResponse.ok) {
-    // Write the proxied response to the cache; it will expire in 1 hour
+    // Write the proxied response to the cache; it will expire in 1 hour.
+    // For article pages, this is only the page's <head>.
     cachedResponse = proxiedResponse.clone();
     cachedResponse.headers.set("Cache-Control", "max-age=3600");
     await cache.put(proxyURL, cachedResponse);

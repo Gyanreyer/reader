@@ -37,10 +37,21 @@ import { Dexie } from "/lib/dexie.js";
  */
 
 /**
+ * A host which refused or failed an article page fetch, so we shouldn't ask it again until `retryAfter`.
+ *
+ * @typedef {{
+ *  host: string;
+ *  retryAfter: number;
+ *  reason: string;
+ * }} HostFailure
+ */
+
+/**
  * @type {TDexie & {
  *   feeds: Table<Feed, Feed["url"]>;
  *   articles: Table<Article, Article["url"]>
  *   settings: Table<Setting, Setting["name"]>
+ *   hostFailures: Table<HostFailure, HostFailure["host"]>
  * }}
  */
 export const db = /** @type {any} */ (new Dexie("FeedsDatabase"));
@@ -73,6 +84,10 @@ db.version(3)
         }
       })
   );
+
+db.version(4).stores({
+  hostFailures: "host",
+});
 
 db.articles.where({
   read: 1,

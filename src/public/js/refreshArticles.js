@@ -35,6 +35,14 @@ async function updateSavedArticles(parsedArticles) {
         if (latestArticleData) {
           article.title = latestArticleData.title;
           article.publishedAt = latestArticleData.publishedAt;
+          if (
+            latestArticleData.thumbnail &&
+            (article.thumbnail === null ||
+              article.thumbnail === "NO_THUMBNAIL")
+          ) {
+            // Fill in thumbnails for articles we haven't fetched a thumbnail for yet
+            article.thumbnail = latestArticleData.thumbnail;
+          }
         }
       });
 
@@ -49,6 +57,46 @@ async function updateSavedArticles(parsedArticles) {
 }
 
 const WHITE_SPACE_REGEX = /\s+/;
+
+// Images in article content smaller than this are probably emoji, icons, or tracking pixels
+const MIN_CONTENT_IMAGE_SIZE = 100;
+
+/**
+ * Finds the first image in an article's content which could be used as its thumbnail.
+ *
+ * @param {Document} contentDocument
+ * @param {string} articleURL
+ * @returns {{ url: string; alt: string; } | null}
+ */
+const getContentImage = (contentDocument, articleURL) => {
+  for (const image of contentDocument.images) {
+    const src = image.getAttribute("src")?.trim();
+    if (!src || src.startsWith("data:") || !URL.canParse(src, articleURL)) {
+      continue;
+    }
+
+    if (
+      image.classList.contains("emoji") ||
+      image.classList.contains("wp-smiley")
+    ) {
+      continue;
+    }
+
+    // Images with a missing or non-numeric width/height (NaN) could be any size, so we'll allow them
+    const width = Number(image.getAttribute("width") || NaN);
+    const height = Number(image.getAttribute("height") || NaN);
+    if (width < MIN_CONTENT_IMAGE_SIZE || height < MIN_CONTENT_IMAGE_SIZE) {
+      continue;
+    }
+
+    return {
+      url: new URL(src, articleURL).toString(),
+      alt: image.getAttribute("alt")?.trim() ?? "",
+    };
+  }
+
+  return null;
+};
 
 /**
  * @param {{
@@ -86,9 +134,9 @@ const getFormattedArticleData = ({
    */
   let title = null;
   /**
-   * @type {string | null}
+   * @type {{ url: string; alt: string; } | null}
    */
-  let thumbnailURL = null;
+  let thumbnail = null;
   /**
    * @type {number}
    */
@@ -114,7 +162,10 @@ const getFormattedArticleData = ({
   }
 
   if (rawThumbnailURL && URL.canParse(rawThumbnailURL, url)) {
-    thumbnailURL = new URL(rawThumbnailURL, url).toString();
+    thumbnail = {
+      url: new URL(rawThumbnailURL, url).toString(),
+      alt: "",
+    };
   }
 
   if (rawContent) {
@@ -122,6 +173,11 @@ const getFormattedArticleData = ({
       rawContent,
       "text/html"
     );
+
+    if (!thumbnail) {
+      // Using an image from the feed's content saves us from fetching the article page to look for one
+      thumbnail = getContentImage(parsedContentDocument, url);
+    }
     const contentText = parsedContentDocument.body.textContent?.trim() ?? "";
 
     const words = contentText.split(WHITE_SPACE_REGEX);
@@ -145,12 +201,7 @@ const getFormattedArticleData = ({
     wordCount,
     publishedAt,
     discoveredAt: isFirstFetch ? (publishedAt || discoveredAt) : discoveredAt,
-    thumbnail: thumbnailURL
-      ? {
-        url: thumbnailURL,
-        alt: "",
-      }
-      : null,
+    thumbnail,
     read: 0,
   };
 };
