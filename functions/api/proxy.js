@@ -2,6 +2,47 @@
  * @import { PagesFunction } from '@cloudflare/workers-types';
  */
 
+// Generated from feeds.yml by scripts/build-feeds.js, which runs before the Function is bundled
+import feedURLs from "../../_site/feeds.json";
+
+/**
+ * Normalizes a hostname so that "www.example.com" and "example.com" are treated as the same host.
+ *
+ * @param {string} hostname
+ */
+const normalizeHostname = (hostname) => hostname.replace(/^www\./, "");
+
+const allowedFeedURLs = new Set(feedURLs);
+
+const allowedHostnames = new Set(
+  feedURLs.flatMap((feedURL) =>
+    URL.canParse(feedURL) ? [normalizeHostname(new URL(feedURL).hostname)] : []
+  )
+);
+
+/**
+ * The proxy only fetches subscribed feeds, or article pages on the same host as a subscribed feed.
+ *
+ * @param {string} proxyURL
+ */
+const isAllowedProxyURL = (proxyURL) => {
+  if (allowedFeedURLs.has(proxyURL)) {
+    return true;
+  }
+
+  if (!URL.canParse(proxyURL)) {
+    return false;
+  }
+
+  const parsedProxyURL = new URL(proxyURL);
+
+  return (
+    (parsedProxyURL.protocol === "https:" ||
+      parsedProxyURL.protocol === "http:") &&
+    allowedHostnames.has(normalizeHostname(parsedProxyURL.hostname))
+  );
+};
+
 /**
  * @param {Request} proxyRequest
  * @param {Headers} responseHeaders
@@ -90,16 +131,6 @@ export const onRequest = async (context) => {
     );
   }
 
-  if (requestURL.hostname !== context.env.ALLOWED_ORIGIN) {
-    return new Response(
-      `Request origin ${requestURL.toString()} is not allowed`,
-      {
-        status: 403,
-        headers: responseHeaders,
-      }
-    );
-  }
-
   if (context.request.method !== "GET") {
     return new Response(`Method ${context.request.method} is not allowed`, {
       status: 405,
@@ -116,6 +147,13 @@ export const onRequest = async (context) => {
         headers: responseHeaders,
       }
     );
+  }
+
+  if (!isAllowedProxyURL(proxyURL)) {
+    return new Response(`Proxying ${proxyURL} is not allowed`, {
+      status: 403,
+      headers: responseHeaders,
+    });
   }
 
   const cache = await caches.open("proxy-cache");
