@@ -33,6 +33,20 @@ export default class FeedsList extends LitElement {
     li a[aria-current="page"] {
       color: var(--clr-accent);
     }
+
+    .feed-status {
+      display: block;
+      margin-block-start: 0.15rem;
+      font-size: 0.8rem;
+      overflow-wrap: anywhere;
+    }
+
+    .dead-badge {
+      font-size: 0.75rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: var(--clr-negative-action);
+    }
   `;
 
   constructor() {
@@ -74,6 +88,12 @@ export default class FeedsList extends LitElement {
             >
               ${feed.title}
             </a>
+            ${feed.deadReason
+              ? html`<span class="dead-badge" title=${feed.deadReason}>Dead</span>`
+              : null}
+            ${feed.movedTo
+              ? html`<span class="feed-status">Moved to ${feed.movedTo}</span>`
+              : null}
           </li>`;
         }) ?? ""}
       </ul>

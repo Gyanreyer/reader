@@ -104,6 +104,55 @@ const getArticleHeadResponse = async (response) => {
   });
 };
 
+const MAX_REDIRECTS = 10;
+
+// Tells the client the URL that a proxied URL has permanently moved to
+const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
+
+/**
+ * Fetches a request, following redirects ourselves so we can tell when a URL has permanently moved.
+ *
+ * @param {Request} proxyRequest
+ * @returns {Promise<{ response: Response; permanentRedirectURL: string | null; }>}
+ */
+const fetchFollowingRedirects = async (proxyRequest) => {
+  let currentRequest = proxyRequest;
+  /**
+   * @type {string | null}
+   */
+  let permanentRedirectURL = null;
+  let isPermanentSoFar = true;
+
+  for (let i = 0; i <= MAX_REDIRECTS; ++i) {
+    const response = await fetch(currentRequest, { redirect: "manual" });
+
+    const location = response.headers.get("Location");
+    if (
+      response.status < 300 ||
+      response.status >= 400 ||
+      response.status === 304 ||
+      !location ||
+      !URL.canParse(location, currentRequest.url)
+    ) {
+      return { response, permanentRedirectURL };
+    }
+
+    await response.body?.cancel();
+
+    const redirectURL = new URL(location, currentRequest.url).toString();
+
+    // The original URL has only permanently moved if every redirect up to this one was also permanent
+    isPermanentSoFar &&= response.status === 301 || response.status === 308;
+    if (isPermanentSoFar) {
+      permanentRedirectURL = redirectURL;
+    }
+
+    currentRequest = new Request(redirectURL, currentRequest);
+  }
+
+  throw new Error(`Exceeded ${MAX_REDIRECTS} redirects`);
+};
+
 /**
  * @param {Request} proxyRequest
  * @param {Headers} responseHeaders
@@ -111,7 +160,12 @@ const getArticleHeadResponse = async (response) => {
  */
 const getProxiedResponse = async (proxyRequest, responseHeaders) => {
   try {
-    const proxiedResponse = await fetch(proxyRequest);
+    const { response: proxiedResponse, permanentRedirectURL } =
+      await fetchFollowingRedirects(proxyRequest);
+
+    if (permanentRedirectURL) {
+      responseHeaders.set(PERMANENT_REDIRECT_HEADER, permanentRedirectURL);
+    }
 
     if (proxiedResponse.ok) {
       const requestEtag = proxyRequest.headers.get("If-None-Match");
@@ -123,7 +177,7 @@ const getProxiedResponse = async (proxyRequest, responseHeaders) => {
         proxiedResponse.body.cancel();
         return new Response(null, {
           status: 304,
-          responseHeaders,
+          headers: responseHeaders,
         });
       }
 
@@ -141,7 +195,7 @@ const getProxiedResponse = async (proxyRequest, responseHeaders) => {
           proxiedResponse.body.cancel();
           return new Response(null, {
             status: 304,
-            responseHeaders,
+            headers: responseHeaders,
           });
         }
       }
@@ -158,9 +212,9 @@ const getProxiedResponse = async (proxyRequest, responseHeaders) => {
       headers: responseHeaders,
     });
   } catch (e) {
-    return new Response(`Failed to proxy request to ${proxyURL}`, {
+    return new Response(`Failed to proxy request to ${proxyRequest.url}: ${e}`, {
       status: 500,
-      responseHeaders,
+      headers: responseHeaders,
     });
   }
 };

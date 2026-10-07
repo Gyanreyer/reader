@@ -5,6 +5,7 @@ import "/js/components/feeds-list.js";
 import "/js/components/refresh-button.js";
 import "/js/components/refresh-progress-bar.js";
 import "/js/components/header-title.js";
+import "/js/components/feed-status.js";
 import "/js/components/filter-modal.js";
 import "/js/components/articles-list/articles-list.js";
 import "/js/components/foot-er.js";

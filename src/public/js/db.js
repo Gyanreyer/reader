@@ -11,6 +11,11 @@ import { Dexie } from "/lib/dexie.js";
  *  nextRefreshAt?: number | null; // The earliest time the feed should be fetched again
  *  etag?: string | null;
  *  lastModified?: string | null;
+ *  failureCount?: number; // The number of consecutive failed fetches, which determines how long we back off for
+ *  notFoundCount?: number; // The number of consecutive fetches which returned 404 Not Found
+ *  notFoundSince?: number | null; // When the current run of 404s started
+ *  deadReason?: string | null; // Set when the feed is dead, explaining why; dead feeds are never fetched again
+ *  movedTo?: string | null; // The URL the feed has permanently redirected to
  * }} Feed
  */
 

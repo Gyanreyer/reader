@@ -2,6 +2,7 @@ import { db } from "./db.js";
 import { refreshFeeds } from "./refreshFeeds.js";
 import { settings } from "./settings.js";
 import { enqueueForHost, getHostKey } from "./utils/hostQueue.js";
+import { parseRetryAfter } from "./utils/parseRetryAfter.js";
 import { proxiedFetch } from "./utils/proxiedFetch.js";
 
 /**
@@ -369,81 +370,32 @@ async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
 }
 
 /**
- * @param {import("./db.js").Feed} feed
- * @param {boolean} [shouldForceRefresh=false] If true, the feed will be refreshed regardless of the last refresh time
-
+ * Parses a feed's response and saves its articles.
+ *
+ * @param {string} feedURL
+ * @param {string} feedText
+ * @param {string | null} contentType
+ * @param {boolean} isFirstFetch
+ *
  * @returns {Promise<number>} The number of new articles that were added to the database
  */
-export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
-  const isFirstFetch = (feed.lastRefreshedAt ?? 0) === 0;
-
-  const refreshInterval = await settings.get("articleRefreshInterval");
-
-  if (!shouldForceRefresh) {
-    // Feeds fetched before we stored nextRefreshAt are due one refresh interval after their last refresh
-    const nextRefreshAt =
-      feed.nextRefreshAt ?? (feed.lastRefreshedAt ?? 0) + refreshInterval;
-    if (Date.now() < nextRefreshAt) {
-      return 0;
-    }
-  }
-
-  const nextRefreshAt = Date.now() + refreshInterval;
-
-  const headers = new Headers({
-    "If-None-Match": feed.etag ?? "",
-    "If-Modified-Since": feed.lastModified ?? "",
-  });
-
-  const feedResponse = await proxiedFetch(feed.url, {
-    method: "GET",
-    headers,
-  });
-
-  if (feedResponse.status === 304) {
-    // The feed is unchanged, no need to update the database
-    db.feeds.update(feed.url, {
-      lastRefreshedAt: Date.now(),
-      nextRefreshAt,
-    });
-    return 0;
-  }
-
-  if (!feedResponse.ok) {
-    db.feeds.update(feed.url, {
-      lastRefreshedAt: Date.now(),
-      nextRefreshAt,
-    });
-    throw new Error(
-      `Unable to refresh feed articles: received ${feedResponse.status} ${feedResponse.statusText} response from feed URL ${feed.url}`
-    );
-  }
-
-  db.feeds.update(feed.url, {
-    etag: feedResponse.headers.get("Etag"),
-    lastModified: feedResponse.headers.get("Last-Modified"),
-    lastRefreshedAt: Date.now(),
-    nextRefreshAt,
-  });
-
-  const feedText = await feedResponse.text();
-
-  switch (feedResponse.headers.get("content-type")) {
+async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
+  switch (contentType) {
     case "application/atom+xml":
       return processAtomFeedResponse(
-        feed.url,
+        feedURL,
         domParser.parseFromString(feedText, "application/xml"),
         isFirstFetch
       );
     case "application/rss+xml":
       return processRSSFeedResponse(
-        feed.url,
+        feedURL,
         domParser.parseFromString(feedText, "application/xml"),
         isFirstFetch
       );
     case "application/feed+json":
     case "application/json":
-      return processJSONFeedResponse(feed.url, JSON.parse(feedText), isFirstFetch);
+      return processJSONFeedResponse(feedURL, JSON.parse(feedText), isFirstFetch);
   }
 
   // If we're at this point, we've received an unrecognized content type. Let's see if we can figure it out.
@@ -458,7 +410,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     }
 
     if (feedJSON) {
-      return processJSONFeedResponse(feed.url, feedJSON, isFirstFetch);
+      return processJSONFeedResponse(feedURL, feedJSON, isFirstFetch);
     }
   }
 
@@ -469,13 +421,195 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     rootElement.tagName === "feed" &&
     rootElement.namespaceURI === "http://www.w3.org/2005/Atom"
   ) {
-    return processAtomFeedResponse(feed.url, feedDocument, isFirstFetch);
+    return processAtomFeedResponse(feedURL, feedDocument, isFirstFetch);
   } else if (rootElement.tagName === "rss") {
-    return processRSSFeedResponse(feed.url, feedDocument, isFirstFetch);
+    return processRSSFeedResponse(feedURL, feedDocument, isFirstFetch);
   } else {
     throw new Error(
-      `Received unrecognized XML feed format for feed URL ${feed.url}`
+      `Received unrecognized XML feed format for feed URL ${feedURL}`
     );
+  }
+}
+
+
+// A feed is dead after this many consecutive 404 Not Found responses
+const MAX_NOT_FOUND_COUNT = 5;
+
+// Backoff after consecutive failures doubles each time, up to this limit
+const MAX_BACKOFF_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+// The proxy sets this header when the feed URL permanently redirects to a new URL
+const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
+
+/**
+ * Thrown when a feed's response has an error status.
+ */
+class FeedResponseError extends Error {
+  /**
+   * @param {string} feedURL
+   * @param {Response} response
+   */
+  constructor(feedURL, response) {
+    super(
+      `Unable to refresh feed articles: received ${response.status} ${response.statusText} response from feed URL ${feedURL}`
+    );
+    this.response = response;
+  }
+}
+
+/**
+ * @param {number} timestamp
+ * @returns {string} The local date in YYYY-MM-DD format
+ */
+const formatDate = (timestamp) => {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
+/**
+ * Gets the changes to save on a feed after a failed fetch, so we back off from fetching it,
+ * or stop fetching it entirely if it's gone.
+ *
+ * @param {Feed} feed
+ * @param {Response | null} response The error response, or null if the fetch failed without one
+ * @param {number} refreshInterval
+ * @returns {Partial<Feed>}
+ */
+function getFeedFailureChanges(feed, response, refreshInterval) {
+  const now = Date.now();
+  const failureCount = (feed.failureCount ?? 0) + 1;
+
+  /**
+   * @type {Partial<Feed>}
+   */
+  const changes = {
+    lastRefreshedAt: now,
+    failureCount,
+    notFoundCount: 0,
+    notFoundSince: null,
+  };
+
+  if (response?.status === 410) {
+    changes.deadReason = `Publisher returned 410 Gone on ${formatDate(now)}`;
+  } else if (response?.status === 404) {
+    changes.notFoundCount = (feed.notFoundCount ?? 0) + 1;
+    changes.notFoundSince = feed.notFoundSince ?? now;
+    if (changes.notFoundCount >= MAX_NOT_FOUND_COUNT) {
+      changes.deadReason = `404 Not Found on ${
+        changes.notFoundCount
+      } consecutive fetches since ${formatDate(changes.notFoundSince)}`;
+    }
+  }
+
+  // Wait twice as long after each consecutive failure
+  let nextRefreshAt =
+    now +
+    Math.min(refreshInterval * 2 ** (failureCount - 1), MAX_BACKOFF_INTERVAL);
+
+  if (response?.status === 429 || response?.status === 503) {
+    // The publisher may have told us how long to wait
+    const retryAfter = parseRetryAfter(response.headers.get("Retry-After"));
+    if (retryAfter) {
+      nextRefreshAt = Math.max(nextRefreshAt, retryAfter);
+    }
+  }
+
+  changes.nextRefreshAt = nextRefreshAt;
+
+  return changes;
+}
+
+/**
+ * @param {Feed} feed
+ * @param {boolean} [shouldForceRefresh=false] If true, the feed will be refreshed regardless of the last refresh time,
+ *  unless we're backing off from it after a failure
+
+ * @returns {Promise<number>} The number of new articles that were added to the database
+ */
+export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
+  if (feed.deadReason) {
+    // Dead feeds are never fetched again
+    return 0;
+  }
+
+  const refreshInterval = await settings.get("articleRefreshInterval");
+
+  // Feeds fetched before we stored nextRefreshAt are due one refresh interval after their last refresh
+  const nextRefreshAt =
+    feed.nextRefreshAt ?? (feed.lastRefreshedAt ?? 0) + refreshInterval;
+  const isBackingOff = (feed.failureCount ?? 0) > 0;
+  if (Date.now() < nextRefreshAt && (!shouldForceRefresh || isBackingOff)) {
+    return 0;
+  }
+
+  // If we've never stored any articles from this feed, it's new (or has only ever failed), so we'll treat
+  // its articles as discovered when they were published rather than letting its whole back catalog appear as new
+  const isFirstFetch =
+    (await db.articles.where("feedURL").equals(feed.url).limit(1).count()) ===
+    0;
+
+  const headers = new Headers({
+    "If-None-Match": feed.etag ?? "",
+    "If-Modified-Since": feed.lastModified ?? "",
+  });
+
+  try {
+    const feedResponse = await proxiedFetch(feed.url, {
+      method: "GET",
+      headers,
+    });
+
+    if (!feedResponse.ok && feedResponse.status !== 304) {
+      feedResponse.body?.cancel();
+      throw new FeedResponseError(feed.url, feedResponse);
+    }
+
+    let newArticlesCount = 0;
+
+    /**
+     * @type {Partial<Feed>}
+     */
+    const changes = {
+      lastRefreshedAt: Date.now(),
+      nextRefreshAt: Date.now() + refreshInterval,
+      failureCount: 0,
+      notFoundCount: 0,
+      notFoundSince: null,
+      movedTo: feedResponse.headers.get(PERMANENT_REDIRECT_HEADER),
+    };
+
+    // A 304 means the feed is unchanged, so there's nothing to process
+    if (feedResponse.status !== 304) {
+      newArticlesCount = await processFeedText(
+        feed.url,
+        await feedResponse.text(),
+        feedResponse.headers.get("content-type"),
+        isFirstFetch
+      );
+
+      // Only save these once the articles are saved, so a failure to process the feed doesn't
+      // leave us with conditional headers that would skip over the articles we missed
+      changes.etag = feedResponse.headers.get("Etag");
+      changes.lastModified = feedResponse.headers.get("Last-Modified");
+    }
+
+    await db.feeds.update(feed.url, changes);
+
+    return newArticlesCount;
+  } catch (e) {
+    // Network errors and unparseable feeds count as failures too
+    await db.feeds.update(
+      feed.url,
+      getFeedFailureChanges(
+        feed,
+        e instanceof FeedResponseError ? e.response : null,
+        refreshInterval
+      )
+    );
+    throw e;
   }
 }
 

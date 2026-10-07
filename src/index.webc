@@ -29,6 +29,7 @@ description: "Ryan's RSS Feed Reader"
         </nav>
       </header>
       <div id="main-content">
+        <feed-status></feed-status>
         <articles-list></articles-list>
         <foot-er></foot-er>
       </div>
