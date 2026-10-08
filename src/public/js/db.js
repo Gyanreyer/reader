@@ -7,7 +7,8 @@ import { Dexie } from "/lib/dexie.js";
  * @typedef {{
  *  url: string;
  *  title: string;
- *  lastRefreshedAt: number | null;
+ *  lastRefreshedAt: number | null; // When we last tried to fetch the feed, whether or not it succeeded
+ *  lastSuccessfulRefreshAt?: number | null; // When we last fetched the feed successfully; new articles can't count as discovered before this
  *  nextRefreshAt?: number | null; // The earliest time the feed should be fetched again
  *  refreshHint?: number | null; // How often the publisher suggests fetching the feed, in milliseconds
  *  etag?: string | null;
@@ -17,6 +18,7 @@ import { Dexie } from "/lib/dexie.js";
  *  notFoundSince?: number | null; // When the current run of 404s started
  *  deadReason?: string | null; // Set when the feed is dead, explaining why; dead feeds are never fetched again
  *  movedTo?: string | null; // The URL the feed has permanently redirected to
+ *  isMultiAuthor?: boolean; // Whether the feed's stored articles credit more than one distinct author
  * }} Feed
  */
 
@@ -33,6 +35,7 @@ import { Dexie } from "/lib/dexie.js";
  *    alt: string;
  *  } | "NO_THUMBNAIL" | null;
  *  wordCount: number | null;
+ *  author?: string | null; // The article's authors as one string, like "Ana, Ben, and Cy"; display only
  * }} Article
  */
 
@@ -95,6 +98,77 @@ db.version(3)
 db.version(4).stores({
   hostFailures: "host",
 });
+
+db.version(5).stores({
+  // Articles are listed by discovered day, so every index is ordered by discoveredAt after the fields being filtered on.
+  // The single-feed view sorts each day's articles by publishedAt itself.
+  articles:
+    "url, [discoveredAt+publishedAt], [read+discoveredAt+publishedAt], [feedURL+discoveredAt], [feedURL+read+discoveredAt]",
+});
+
+db.version(6)
+  .stores({})
+  .upgrade(async (tx) => {
+    // Articles used to count as discovered when the refresh which found them ran, so a feed's first fetch (before
+    // that was special-cased) or a backlog after a long break all landed on one day. Re-apply the rule from
+    // refreshArticles.js: discovered when published, but no earlier than the previous fetch of the feed.
+    //
+    // We don't know when past fetches ran, but each refresh used to give all of its new articles the same
+    // discoveredAt, so a feed's previous batch of articles is the latest we know it was fetched before a given batch.
+
+    /**
+     * @type {Map<string, Set<number>>}
+     */
+    const feedBatches = new Map();
+    await tx
+      .table("articles")
+      .toCollection()
+      .each((article) => {
+        let batches = feedBatches.get(article.feedURL);
+        if (!batches) {
+          batches = new Set();
+          feedBatches.set(article.feedURL, batches);
+        }
+        batches.add(article.discoveredAt);
+      });
+
+    /**
+     * @type {Map<string, Map<number, number>>} For each feed, maps each batch's discoveredAt to the previous batch's
+     */
+    const previousBatches = new Map();
+    for (const [feedURL, batches] of feedBatches) {
+      const sortedBatches = [...batches].sort((a, b) => a - b);
+      previousBatches.set(
+        feedURL,
+        new Map(sortedBatches.slice(1).map((batch, i) => [batch, sortedBatches[i]]))
+      );
+    }
+
+    await tx
+      .table("articles")
+      .toCollection()
+      .modify((article) => {
+        if (!(article.publishedAt > 0)) {
+          return;
+        }
+        const previousBatch =
+          previousBatches.get(article.feedURL)?.get(article.discoveredAt) ?? 0;
+        article.discoveredAt = Math.min(
+          Math.max(article.publishedAt, previousBatch),
+          article.discoveredAt
+        );
+      });
+
+    // Feeds with stored articles have fetched successfully; lastRefreshedAt is our best guess at when they last did
+    await tx
+      .table("feeds")
+      .toCollection()
+      .modify((feed) => {
+        feed.lastSuccessfulRefreshAt = feedBatches.has(feed.url)
+          ? feed.lastRefreshedAt ?? null
+          : null;
+      });
+  });
 
 db.articles.where({
   read: 1,

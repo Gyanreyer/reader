@@ -24,6 +24,9 @@ export default class ArticleListItem extends LitElement {
     _feedTitle: {
       state: true,
     },
+    _isMultiAuthorFeed: {
+      state: true,
+    },
     isVisible: {
       state: true,
     },
@@ -156,7 +159,7 @@ export default class ArticleListItem extends LitElement {
       column-gap: 0.2rem;
     }
 
-    #author,
+    #byline,
     #published-at {
       grid-column: 1 / 2;
     }
@@ -166,7 +169,7 @@ export default class ArticleListItem extends LitElement {
       grid-column: 3 / 4;
     }
 
-    #author,
+    #byline,
     #word-count {
       grid-row: 1 / 2;
     }
@@ -233,10 +236,6 @@ export default class ArticleListItem extends LitElement {
       display: flex;
       gap: 0;
 
-      #author {
-        display: none;
-      }
-
       p {
         font-size: clamp(0.75rem, 1cqw, 0.9rem);
         padding-inline-end: 0.75em;
@@ -283,10 +282,7 @@ export default class ArticleListItem extends LitElement {
      */
     this._feedTitle = null;
 
-    /**
-     * @type {string | null}
-     */
-    this._feedTitle = null;
+    this._isMultiAuthorFeed = false;
 
     this.isVisible = false;
 
@@ -300,6 +296,7 @@ export default class ArticleListItem extends LitElement {
         db.feeds.get(article.feedURL).then((feed) => {
           if (feed) {
             this._feedTitle = feed.title;
+            this._isMultiAuthorFeed = feed.isMultiAuthor ?? false;
           }
         });
       }
@@ -371,6 +368,24 @@ export default class ArticleListItem extends LitElement {
     }
   }
 
+  /**
+   * The line under the article naming its feed, and its author for multi-author feeds.
+   */
+  _renderByline() {
+    const author = this._article?.author;
+    const shouldShowAuthor =
+      this._isMultiAuthorFeed && author && author !== this._feedTitle;
+
+    // Articles in a feed group are compact, and the group's header already names the feed
+    if (this.hasAttribute("data-compact")) {
+      return shouldShowAuthor ? html`<p id="byline">${author}</p>` : null;
+    }
+
+    return html`<p id="byline">
+      ${this._feedTitle}${shouldShowAuthor ? ` · ${author}` : null}
+    </p>`;
+  }
+
   render() {
     if (!this._article) {
       return;
@@ -413,7 +428,7 @@ export default class ArticleListItem extends LitElement {
         </h2>
       </header>
       <div id="article-info">
-        <p id="author">${this._feedTitle}</p>
+        ${this._renderByline()}
         <p id="published-at">
           <span class="sr-only">Published</span>
           <time datetime="${parsedPublishedAt.toISOString()}"

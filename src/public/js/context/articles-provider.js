@@ -7,13 +7,13 @@ import {
 } from "/lib/lit.js";
 import { articlesContext } from "/js/context/articlesContext.js";
 import { filtersContext } from "./filtersContext.js";
-import { db } from "/js/db.js";
-import { Dexie } from "/lib/dexie.js";
+import { getArticleBatch } from "../articleBatches.js";
 import { refreshAllArticles } from "../refreshArticles.js";
 
 /**
  * @import { ArticlesContextValue } from './articlesContext.js';
  * @import { FiltersContextValue } from './filtersContext.js';
+ * @import { ArticleFilters } from '../articleBatches.js';
  */
 export default class ArticlesProvider extends LitElement {
   static tagName = "articles-provider";
@@ -31,13 +31,24 @@ export default class ArticlesProvider extends LitElement {
      * @type {typeof articlesContext.__context__}
      */
     this._contextValue = {
-      articleURLs: [],
+      days: [],
       isLoadingArticles: true,
-      totalArticleCount: 0,
+      hasMoreArticles: true,
       refreshProgress: 0,
       isRefreshing: true,
       areArticlesStale: false,
     };
+
+    /**
+     * @type {ArticleFilters | null}
+     */
+    this._filters = null;
+    // The start of the oldest discovered day loaded so far
+    this._cursor = Infinity;
+    // Incremented whenever the list is reset, so batches from before the reset are discarded
+    this._listGeneration = 0;
+    // Set when the list should be rebuilt as soon as the current Refresh finishes
+    this._shouldRebuildListAfterRefresh = false;
 
     this._provider = new ContextProvider(this, {
       context: articlesContext,
@@ -56,13 +67,48 @@ export default class ArticlesProvider extends LitElement {
   connectedCallback() {
     super.connectedCallback();
 
+    // Refresh on page load, only fetching feeds which are due
+    this._startRefresh({ isBackground: true });
+  }
+
+  /**
+   * Scrolls to the top and resets the list to today right away, then refreshes every feed regardless of when
+   * it was last fetched, and rebuilds the list once that finishes.
+   */
+  refresh() {
+    this.updateArticlesList();
+
+    if (this._contextValue.isRefreshing) {
+      // Don't fetch every feed twice at once; rebuild the list when the current Refresh finishes instead
+      this._shouldRebuildListAfterRefresh = true;
+      return;
+    }
+
+    this._startRefresh({ isBackground: false });
+  }
+
+  /**
+   * @param {object} options
+   * @param {boolean} options.isBackground A background Refresh only fetches feeds which are due, and flags any new
+   *  articles rather than rebuilding the list under the reader
+   */
+  _startRefresh({ isBackground }) {
+    this._shouldRebuildListAfterRefresh = !isBackground;
+
+    this.updateContextValue({
+      isRefreshing: true,
+      refreshProgress: 0,
+    });
+
     refreshAllArticles({
+      shouldForceRefresh: !isBackground,
       onProgress: (progress, hasNewArticles) => {
         this.updateContextValue({
           refreshProgress: progress,
-          isRefreshing: true,
+          // If the list is going to be rebuilt anyway, there's no need to flag new articles
           areArticlesStale:
-            this._contextValue.areArticlesStale || hasNewArticles,
+            this._contextValue.areArticlesStale ||
+            (hasNewArticles && !this._shouldRebuildListAfterRefresh),
         });
       },
       onComplete: () => {
@@ -70,6 +116,11 @@ export default class ArticlesProvider extends LitElement {
           refreshProgress: 1,
           isRefreshing: false,
         });
+
+        if (this._shouldRebuildListAfterRefresh) {
+          this._shouldRebuildListAfterRefresh = false;
+          this.updateArticlesList();
+        }
       },
     });
   }
@@ -87,6 +138,8 @@ export default class ArticlesProvider extends LitElement {
   }
 
   /**
+   * Resets the list to the newest discovered days for the current filters, and scrolls back to the top.
+   *
    * @param {FiltersContextValue} [filtersContextValue]
    * @returns {Promise<void>}
    */
@@ -97,101 +150,87 @@ export default class ArticlesProvider extends LitElement {
       throw new Error("Filters context value is not available");
     }
 
-    const { includeRead, includeUnread, pageNumber, pageSize } =
-      filtersContextValue;
+    const { includeRead, includeUnread } = filtersContextValue;
+
+    this._filters = {
+      includeRead,
+      includeUnread,
+      filterFeedURL: new URLSearchParams(window.location.search).get(
+        "filter-feed-url"
+      ),
+    };
+    this._cursor = Infinity;
+    const listGeneration = ++this._listGeneration;
 
     this.updateContextValue({
+      days: [],
+      hasMoreArticles: true,
       areArticlesStale: false,
+    });
+
+    // Above 600px <main> scrolls, and below it the window does
+    document.querySelector("main")?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+
+    await this._loadNextBatch(listGeneration);
+  }
+
+  /**
+   * Loads the next batch of older discovered days onto the end of the list.
+   *
+   * @returns {Promise<void>}
+   */
+  async loadMoreArticles() {
+    if (
+      !this._filters ||
+      this._contextValue.isLoadingArticles ||
+      !this._contextValue.hasMoreArticles
+    ) {
+      return;
+    }
+
+    await this._loadNextBatch(this._listGeneration);
+  }
+
+  /**
+   * @param {number} listGeneration
+   */
+  async _loadNextBatch(listGeneration) {
+    if (!this._filters) {
+      return;
+    }
+
+    this.updateContextValue({
       isLoadingArticles: true,
     });
 
-    const searchParams = new URLSearchParams(window.location.search);
-    const filterFeedURL = searchParams.get("filter-feed-url");
+    try {
+      const { days, nextCursor, hasMoreArticles } = await getArticleBatch(
+        this._filters,
+        this._cursor
+      );
 
-    let articlesCollection;
-
-    if (filterFeedURL) {
-      if (includeRead && includeUnread) {
-        articlesCollection = db.articles
-          .where("feedURL")
-          .equals(filterFeedURL);
-      } else {
-        articlesCollection = db.articles
-          .where(["feedURL", "read"])
-          .between(
-            [filterFeedURL, includeUnread ? 0 : 1],
-            [filterFeedURL, includeRead ? 2 : 1],
-            true, true,
-          );
+      if (listGeneration !== this._listGeneration) {
+        // The list was reset while this batch was loading
+        return;
       }
-    } else {
-      if (includeRead && includeUnread) {
-        articlesCollection = db.articles.orderBy(["discoveredAt", "publishedAt"]);
-      } else {
-        articlesCollection = db.articles
-          .where("read")
-          .between(
-            includeUnread ? 0 : 1,
-            includeRead ? 2 : 1,
-            true, true,
-          );
+
+      this._cursor = nextCursor;
+      this.updateContextValue({
+        days: [...this._contextValue.days, ...days],
+        hasMoreArticles,
+        isLoadingArticles: false,
+      });
+    } catch (e) {
+      console.error("Failed to load articles:", e);
+      if (listGeneration === this._listGeneration) {
+        // Stop trying to load more, so a persistent error doesn't make us retry forever
+        this.updateContextValue({
+          hasMoreArticles: false,
+          isLoadingArticles: false,
+        });
       }
     }
-
-    const totalArticleCount = await articlesCollection.count();
-
-    const clampedPageNumber = Math.min(
-      pageNumber,
-      // Clamp so we can't go to a page that doesn't exist
-      Math.max(Math.ceil(totalArticleCount / pageSize), 1)
-    );
-
-    const pageStartIndex = (clampedPageNumber - 1) * pageSize;
-
-    const articles = await articlesCollection
-      .offset(pageStartIndex)
-      .limit(pageSize)
-      .reverse()
-      .sortBy("publishedAt");
-
-    /**
-     * @type {Array<({
-     *  feedURL: string;
-     *  feedTitle: string;
-     *  articleURLs: string[];
-     * }) | string>}
-     */
-    const groupedArticleURLs = [];
-    /**
-     * @type {{
-     *  [feedURL: string]: number;
-     * }}
-     */
-    const feedGroupIndices = {};
-    for (const article of articles) {
-      const feedGroupIndex = feedGroupIndices[article.feedURL];
-      if (feedGroupIndex !== undefined) {
-        if (typeof groupedArticleURLs[feedGroupIndex] === "string") {
-          const feedTitle = await db.feeds.get(article.feedURL).then(feed => feed?.title || article.feedURL);
-
-          groupedArticleURLs[feedGroupIndex] = {
-            feedURL: article.feedURL,
-            feedTitle,
-            articleURLs: [groupedArticleURLs[feedGroupIndex], article.url],
-          };
-        } else {
-          groupedArticleURLs[feedGroupIndex].articleURLs.push(article.url);
-        }
-      } else {
-        feedGroupIndices[article.feedURL] = groupedArticleURLs.push(article.url) - 1;
-      }
-    }
-
-    this.updateContextValue({
-      totalArticleCount: totalArticleCount,
-      articleURLs: groupedArticleURLs,
-      isLoadingArticles: false,
-    });
   }
 
   render() {

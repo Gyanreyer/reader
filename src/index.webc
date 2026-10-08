@@ -15,7 +15,6 @@ description: "Ryan's RSS Feed Reader"
       </aside>
     </side-bar>
     <main>
-      <refresh-button></refresh-button>
       <header>
         <refresh-progress-bar></refresh-progress-bar>
         <nav>
@@ -25,13 +24,15 @@ description: "Ryan's RSS Feed Reader"
             </svg>
           </button>
           <header-title></header-title>
-          <filter-modal></filter-modal>
+          <div id="header-actions">
+            <refresh-button></refresh-button>
+            <filter-modal></filter-modal>
+          </div>
         </nav>
       </header>
       <div id="main-content">
         <feed-status></feed-status>
         <articles-list></articles-list>
-        <foot-er></foot-er>
       </div>
     </main>
   </articles-provider>
@@ -77,17 +78,20 @@ description: "Ryan's RSS Feed Reader"
   main {
     flex: 1;
     transition: transform 0.2s;
-  }
-
-  refresh-button {
-    position: sticky;
-    inset-block-start: 0rem;
+    /** Day headers in the article list stick this far from the top of the scroll container */
+    --day-header-top: 0px;
   }
 
   main header {
     background-color: vaR(--clr-accent);
     color: white;
     box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  #header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   main header nav {
@@ -109,6 +113,27 @@ description: "Ryan's RSS Feed Reader"
 
     main {
       overflow-y: auto;
+      /** Set by stickyHeader.js */
+      --day-header-top: var(--main-header-height, 0px);
+    }
+
+    /** <main> is the scroll container on desktop, so its header can stick to the top, and compacts once scrolled */
+    main header {
+      position: sticky;
+      inset-block-start: 0;
+      z-index: 2;
+    }
+
+    main header nav {
+      transition: padding 0.2s;
+    }
+
+    main[data-scrolled] header nav {
+      padding-block: 0.75rem;
+    }
+
+    main[data-scrolled] header-title {
+      font-size: 0.75rem;
     }
 
     #sidebar-button {

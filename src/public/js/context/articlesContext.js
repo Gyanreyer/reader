@@ -1,14 +1,14 @@
 import { createContext } from "/lib/lit.js";
 
 /**
+ * @import { DiscoveredDay } from '../articleBatches.js';
+ */
+
+/**
  * @typedef {{
- *  articleURLs: Array<({
- *    feedURL: string;
- *    feedTitle: string;
- *    articleURLs: string[];
- *  }) | string>;
+ *  days: DiscoveredDay[]; // The discovered days loaded so far, newest first
  *  isLoadingArticles: boolean;
- *  totalArticleCount: number;
+ *  hasMoreArticles: boolean; // Whether there are older days left to load
  *  isRefreshing: boolean;
  *  refreshProgress: number;
  *  areArticlesStale: boolean;

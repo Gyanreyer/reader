@@ -9,9 +9,6 @@ import { proxiedFetch } from "./utils/proxiedFetch.js";
  * @import { Article, Feed } from './db.js';
  */
 
-// Timestamp to use for all newly discovered articles from this refresh
-const discoveredAt = Date.now();
-
 const domParser = new DOMParser();
 
 /**
@@ -37,6 +34,7 @@ async function updateSavedArticles(parsedArticles) {
         if (latestArticleData) {
           article.title = latestArticleData.title;
           article.publishedAt = latestArticleData.publishedAt;
+          article.author = latestArticleData.author;
           if (
             latestArticleData.thumbnail &&
             (article.thumbnail === null ||
@@ -101,6 +99,117 @@ const getContentImage = (contentDocument, articleURL) => {
 };
 
 /**
+ * Gets when an article counts as discovered: when we would have found it if we'd been checking its feed all along.
+ * That's when it was published, but no earlier than our previous successful fetch of the feed (when it wasn't in the
+ * feed yet), and never in the future. So a feed's back catalog on its first fetch, or a backlog after a long break,
+ * spreads across the days it was published, while an article which shows up with an old publish date still surfaces
+ * as new.
+ *
+ * @param {number} publishedAt
+ * @param {number | null} previousRefreshAt When we last successfully fetched the feed, or null if we never have
+ * @returns {number}
+ */
+const getDiscoveredAt = (publishedAt, previousRefreshAt) => {
+  const now = Date.now();
+  if (!(publishedAt > 0)) {
+    // The publish date is missing or invalid
+    return now;
+  }
+  return Math.min(Math.max(publishedAt, previousRefreshAt ?? 0), now);
+};
+
+const ATOM_NAMESPACE = "http://www.w3.org/2005/Atom";
+const DUBLIN_CORE_NAMESPACE = "http://purl.org/dc/elements/1.1/";
+
+const authorListFormat = new Intl.ListFormat(undefined, {
+  style: "long",
+  type: "conjunction",
+});
+
+/**
+ * @param {Element} parent
+ * @param {string} localName
+ * @param {string | null} namespaceURI
+ * @returns {Element[]}
+ */
+const getChildElements = (parent, localName, namespaceURI) =>
+  Array.from(parent.children).filter(
+    (element) =>
+      element.localName === localName && element.namespaceURI === namespaceURI
+  );
+
+/**
+ * RSS <author> is officially an email address like "jo@x.com (Jo Smith)", so we keep the name in parentheses
+ * and drop a bare email address.
+ *
+ * @param {string | null} rawAuthor
+ * @returns {string | null}
+ */
+const getRSSAuthorName = (rawAuthor) => {
+  const author = rawAuthor?.trim();
+  if (!author) {
+    return null;
+  }
+
+  const nameMatch = author.match(/^\S+@\S+\s*\((.+)\)$/);
+  if (nameMatch) {
+    return nameMatch[1].trim();
+  }
+
+  return /^\S+@\S+$/.test(author) ? null : author;
+};
+
+/**
+ * Gets the names of the authors of an Atom <entry> or <feed>.
+ *
+ * @param {Element} element
+ * @returns {Array<string | null | undefined>}
+ */
+const getAtomAuthorNames = (element) =>
+  getChildElements(element, "author", ATOM_NAMESPACE).map(
+    (author) =>
+      getChildElements(author, "name", ATOM_NAMESPACE)[0]?.textContent
+  );
+
+/**
+ * Gets the names of the authors of a JSON Feed item or feed, from `authors` or the older `author`.
+ *
+ * @param {Record<string, any>} itemOrFeed
+ * @returns {Array<string | null | undefined>}
+ */
+const getJSONFeedAuthorNames = (itemOrFeed) => {
+  if (Array.isArray(itemOrFeed.authors)) {
+    return itemOrFeed.authors.map(
+      /**
+       * @param {any} author
+       */
+      (author) => author?.name
+    );
+  }
+  return [itemOrFeed.author?.name];
+};
+
+/**
+ * Joins author names into a single string like "Ana, Ben, and Cy".
+ *
+ * @param {Array<string | null | undefined>} rawNames
+ * @returns {string | null}
+ */
+const formatAuthorNames = (rawNames) => {
+  /**
+   * @type {string[]}
+   */
+  const names = [];
+  for (const rawName of rawNames) {
+    const name = rawName?.trim();
+    if (name && !names.includes(name)) {
+      names.push(name);
+    }
+  }
+  return names.length > 0 ? authorListFormat.format(names) : null;
+};
+
+/**
  * @param {{
  *  feedURL: string;
  *  rawURL?: string | null;
@@ -108,7 +217,9 @@ const getContentImage = (contentDocument, articleURL) => {
  *  rawContent?: string | null;
  *  rawThumbnailURL?: string | null;
  *  rawPublishedAtTimestamp?: string | null;
- *  isFirstFetch?: boolean;
+ *  rawAuthorNames?: Array<string | null | undefined>;
+ *  rawFeedAuthorNames?: Array<string | null | undefined>; // Used if the article has no authors of its own
+ *  previousRefreshAt?: number | null; // When we last successfully fetched the feed, or null if we never have
  * }} data
  *
  * @returns {Article}
@@ -120,7 +231,9 @@ const getFormattedArticleData = ({
   rawContent = null,
   rawThumbnailURL = null,
   rawPublishedAtTimestamp = null,
-  isFirstFetch = false,
+  rawAuthorNames = [],
+  rawFeedAuthorNames = [],
+  previousRefreshAt = null,
 }) => {
   let url = rawURL?.trim();
 
@@ -202,7 +315,9 @@ const getFormattedArticleData = ({
     title,
     wordCount,
     publishedAt,
-    discoveredAt: isFirstFetch ? (publishedAt || discoveredAt) : discoveredAt,
+    discoveredAt: getDiscoveredAt(publishedAt, previousRefreshAt),
+    author:
+      formatAuthorNames(rawAuthorNames) ?? formatAuthorNames(rawFeedAuthorNames),
     thumbnail,
     read: 0,
   };
@@ -211,9 +326,9 @@ const getFormattedArticleData = ({
 /**
  * @param {string} feedURL
  * @param {Record<string, any>} feedJSON
- * @param {boolean} isFirstFetch
+ * @param {number | null} previousRefreshAt
  */
-async function processJSONFeedResponse(feedURL, feedJSON, isFirstFetch) {
+async function processJSONFeedResponse(feedURL, feedJSON, previousRefreshAt) {
   const feedTitle = feedJSON.title?.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -230,6 +345,8 @@ async function processJSONFeedResponse(feedURL, feedJSON, isFirstFetch) {
    * @type {Record<string, import("./db.js").Article>} Parsed articles to add to the database
    */
   const parsedArticles = {};
+
+  const feedAuthorNames = getJSONFeedAuthorNames(feedJSON);
 
   for (const item of items) {
     try {
@@ -251,7 +368,9 @@ async function processJSONFeedResponse(feedURL, feedJSON, isFirstFetch) {
              */
             (attachment) => attachment.mime_type?.startsWith("image")
           )?.url,
-        isFirstFetch,
+        rawAuthorNames: getJSONFeedAuthorNames(item),
+        rawFeedAuthorNames: feedAuthorNames,
+        previousRefreshAt,
       });
       parsedArticles[article.url] = article;
     } catch (e) {
@@ -271,9 +390,9 @@ async function processJSONFeedResponse(feedURL, feedJSON, isFirstFetch) {
  *
  * @param {string} feedURL
  * @param {Document} feedDocument
- * @param {boolean} isFirstFetch
+ * @param {number | null} previousRefreshAt
  */
-async function processRSSFeedResponse(feedURL, feedDocument, isFirstFetch) {
+async function processRSSFeedResponse(feedURL, feedDocument, previousRefreshAt) {
   const feedTitle = feedDocument.querySelector("channel > title")?.textContent.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -304,7 +423,15 @@ async function processRSSFeedResponse(feedURL, feedDocument, isFirstFetch) {
             .getElementsByTagName("media:thumbnail")?.[0]
             ?.getAttribute("url") ||
           item.querySelector("enclosure[type^=image]")?.getAttribute("url"),
-        isFirstFetch,
+        rawAuthorNames: [
+          ...getChildElements(item, "author", null).map((author) =>
+            getRSSAuthorName(author.textContent)
+          ),
+          ...getChildElements(item, "creator", DUBLIN_CORE_NAMESPACE).map(
+            (creator) => creator.textContent
+          ),
+        ],
+        previousRefreshAt,
       });
 
       parsedArticles[article.url] = article;
@@ -323,9 +450,9 @@ async function processRSSFeedResponse(feedURL, feedDocument, isFirstFetch) {
 /**
  * @param {string} feedURL
  * @param {Document} feedDocument
- * @param {boolean} isFirstFetch
+ * @param {number | null} previousRefreshAt
  */
-async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
+async function processAtomFeedResponse(feedURL, feedDocument, previousRefreshAt) {
   const feedTitle = feedDocument.querySelector("feed > title")?.textContent.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -335,6 +462,8 @@ async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
    * @type {Record<string, Article>} Parsed articles to add to the database
    */
   const parsedArticles = {};
+
+  const feedAuthorNames = getAtomAuthorNames(feedDocument.documentElement);
 
   for (const entry of feedDocument.getElementsByTagName("entry")) {
     try {
@@ -354,7 +483,9 @@ async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
         rawThumbnailURL: entry
           .getElementsByTagName("media:thumbnail")?.[0]
           ?.getAttribute("url"),
-        isFirstFetch,
+        rawAuthorNames: getAtomAuthorNames(entry),
+        rawFeedAuthorNames: feedAuthorNames,
+        previousRefreshAt,
       });
       parsedArticles[article.url] = article;
     } catch (e) {
@@ -470,14 +601,14 @@ function getResponseRefreshHint(response) {
  * @param {string} feedURL
  * @param {string} feedText
  * @param {string | null} contentType
- * @param {boolean} isFirstFetch
+ * @param {number | null} previousRefreshAt
  *
  * @returns {Promise<{
  *  newArticlesCount: number;
  *  refreshHint: number | null;
  * }>} The number of new articles that were added to the database, and how often the feed suggests it should be fetched
  */
-async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
+async function processFeedText(feedURL, feedText, contentType, previousRefreshAt) {
   /**
    * @type {Record<string, any> | null}
    */
@@ -507,7 +638,7 @@ async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
       newArticlesCount: await processJSONFeedResponse(
         feedURL,
         feedJSON,
-        isFirstFetch
+        previousRefreshAt
       ),
       // JSON Feed has no way to suggest how often to fetch it
       refreshHint: null,
@@ -522,7 +653,7 @@ async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
       newArticlesCount: await processAtomFeedResponse(
         feedURL,
         feedDocument,
-        isFirstFetch
+        previousRefreshAt
       ),
       refreshHint,
     };
@@ -531,7 +662,7 @@ async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
       newArticlesCount: await processRSSFeedResponse(
         feedURL,
         feedDocument,
-        isFirstFetch
+        previousRefreshAt
       ),
       refreshHint,
     };
@@ -547,7 +678,7 @@ async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
       newArticlesCount: await processAtomFeedResponse(
         feedURL,
         feedDocument,
-        isFirstFetch
+        previousRefreshAt
       ),
       refreshHint,
     };
@@ -556,7 +687,7 @@ async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
       newArticlesCount: await processRSSFeedResponse(
         feedURL,
         feedDocument,
-        isFirstFetch
+        previousRefreshAt
       ),
       refreshHint,
     };
@@ -565,6 +696,30 @@ async function processFeedText(feedURL, feedText, contentType, isFirstFetch) {
       `Received unrecognized XML feed format for feed URL ${feedURL}`
     );
   }
+}
+
+/**
+ * A feed is a multi-author feed if its stored articles credit more than one distinct author.
+ * Only these feeds show authors on their articles.
+ *
+ * @param {string} feedURL
+ * @returns {Promise<boolean>}
+ */
+async function getIsMultiAuthorFeed(feedURL) {
+  /**
+   * @type {Set<string>}
+   */
+  const authors = new Set();
+  await db.articles
+    .where("[feedURL+discoveredAt]")
+    .between([feedURL, -Infinity], [feedURL, Infinity])
+    .until(() => authors.size > 1)
+    .each((article) => {
+      if (article.author) {
+        authors.add(article.author);
+      }
+    });
+  return authors.size > 1;
 }
 
 // A feed is dead after this many consecutive 404 Not Found responses
@@ -678,11 +833,8 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     return 0;
   }
 
-  // If we've never stored any articles from this feed, it's new (or has only ever failed), so we'll treat
-  // its articles as discovered when they were published rather than letting its whole back catalog appear as new
-  const isFirstFetch =
-    (await db.articles.where("feedURL").equals(feed.url).limit(1).count()) ===
-    0;
+  const previousRefreshAt = feed.lastSuccessfulRefreshAt ?? null;
+  const fetchStartedAt = Date.now();
 
   const headers = new Headers();
   if (feed.etag) {
@@ -710,6 +862,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
      */
     const changes = {
       lastRefreshedAt: Date.now(),
+      lastSuccessfulRefreshAt: fetchStartedAt,
       failureCount: 0,
       notFoundCount: 0,
       notFoundSince: null,
@@ -729,9 +882,10 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
         feed.url,
         await feedResponse.text(),
         feedResponse.headers.get("content-type"),
-        isFirstFetch
+        previousRefreshAt
       );
       newArticlesCount = processedFeed.newArticlesCount;
+      changes.isMultiAuthor = await getIsMultiAuthorFeed(feed.url);
 
       const hints = [responseRefreshHint, processedFeed.refreshHint].filter(
         (hint) => hint !== null
@@ -773,56 +927,70 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
 const MAX_CONCURRENT_FEED_REFRESHES = 6;
 
 /**
- * @param {object} callbacks
- * @param {(progress: number, hasNewArticles: boolean)=>void} callbacks.onProgress
- * @param {()=>void} callbacks.onComplete
+ * Refreshes every feed.
+ *
+ * @param {object} options
+ * @param {(progress: number, hasNewArticles: boolean)=>void} options.onProgress
+ * @param {()=>void} options.onComplete Called when the Refresh finishes, even if it failed
+ * @param {boolean} [options.shouldForceRefresh=false] If true, feeds are fetched even if they aren't due yet,
+ *  unless we're backing off from them after a failure
  */
-export async function refreshAllArticles({ onProgress, onComplete }) {
+export async function refreshAllArticles({
+  onProgress,
+  onComplete,
+  shouldForceRefresh = false,
+}) {
   onProgress(0, false);
 
-  await refreshFeeds();
+  try {
+    await refreshFeeds();
 
-  const feeds = await db.feeds.toArray();
-  const feedCount = feeds.length;
+    const feeds = await db.feeds.toArray();
+    const feedCount = feeds.length;
 
-  let refreshedFeedCount = 0;
+    let refreshedFeedCount = 0;
 
-  // Each host's feeds are refreshed one at a time, so we never fetch more than one feed from a host at once
-  const hostFeedQueues = Array.from(
-    Map.groupBy(feeds, (feed) =>
-      URL.canParse(feed.url) ? getHostKey(feed.url) : feed.url
-    ).values()
-  );
+    // Each host's feeds are refreshed one at a time, so we never fetch more than one feed from a host at once
+    const hostFeedQueues = Array.from(
+      Map.groupBy(feeds, (feed) =>
+        URL.canParse(feed.url) ? getHostKey(feed.url) : feed.url
+      ).values()
+    );
 
-  const refreshNextHostFeeds = async () => {
-    /**
-     * @type {Feed[] | undefined}
-     */
-    let hostFeeds;
-    while ((hostFeeds = hostFeedQueues.shift())) {
-      for (const feed of hostFeeds) {
-        let newArticlesCount = 0;
-        try {
-          // Also queue with this host's article page fetches, so we don't fetch a feed and an article at the same time
-          newArticlesCount = await enqueueForHost(feed.url, () =>
-            refreshArticlesForFeed(feed)
-          );
-        } catch (e) {
-          console.error(`Failed to refresh articles for feed ${feed.url}:`, e);
+    const refreshNextHostFeeds = async () => {
+      /**
+       * @type {Feed[] | undefined}
+       */
+      let hostFeeds;
+      while ((hostFeeds = hostFeedQueues.shift())) {
+        for (const feed of hostFeeds) {
+          let newArticlesCount = 0;
+          try {
+            // Also queue with this host's article page fetches, so we don't fetch a feed and an article at the same time
+            newArticlesCount = await enqueueForHost(feed.url, () =>
+              refreshArticlesForFeed(feed, shouldForceRefresh)
+            );
+          } catch (e) {
+            console.error(`Failed to refresh articles for feed ${feed.url}:`, e);
+          }
+          onProgress(++refreshedFeedCount / feedCount, newArticlesCount > 0);
         }
-        onProgress(++refreshedFeedCount / feedCount, newArticlesCount > 0);
       }
-    }
-  };
+    };
 
-  await Promise.all(
-    Array.from(
-      { length: Math.min(MAX_CONCURRENT_FEED_REFRESHES, hostFeedQueues.length) },
-      refreshNextHostFeeds
-    )
-  );
+    await Promise.all(
+      Array.from(
+        {
+          length: Math.min(MAX_CONCURRENT_FEED_REFRESHES, hostFeedQueues.length),
+        },
+        refreshNextHostFeeds
+      )
+    );
+  } catch (e) {
+    console.error("Failed to refresh feeds:", e);
+  } finally {
+    window.dispatchEvent(new CustomEvent("reader:feeds-updated"));
 
-  window.dispatchEvent(new CustomEvent("reader:feeds-updated"));
-
-  onComplete();
+    onComplete();
+  }
 }

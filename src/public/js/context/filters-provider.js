@@ -1,14 +1,10 @@
 import { LitElement, ContextProvider, html, css } from "/lib/lit.js";
 import { filtersContext } from "./filtersContext.js";
 import { settings } from "../settings.js";
-import { addHistoryChangeEventListener } from "../history.js";
 
 /**
  * @import {FiltersContextValue} from './filtersContext.js';}
  */
-
-const getPageNumber = () =>
-  Number(new URLSearchParams(window.location.search).get("page")) || 1;
 
 export default class FiltersProvider extends LitElement {
   static tagName = "filters-provider";
@@ -19,8 +15,6 @@ export default class FiltersProvider extends LitElement {
     }
   `;
 
-  static PAGE_SIZE = 20;
-
   constructor() {
     super();
 
@@ -30,8 +24,6 @@ export default class FiltersProvider extends LitElement {
     this._contextValue = {
       includeUnread: true,
       includeRead: false,
-      pageNumber: getPageNumber(),
-      pageSize: FiltersProvider.PAGE_SIZE,
     };
     this._provider = new ContextProvider(this, {
       context: filtersContext,
@@ -46,15 +38,6 @@ export default class FiltersProvider extends LitElement {
         includeRead,
         includeUnread,
       });
-    });
-
-    addHistoryChangeEventListener(() => {
-      const pageNumber = getPageNumber();
-      if (pageNumber !== this._contextValue.pageNumber) {
-        this._updateContextValue({
-          pageNumber,
-        });
-      }
     });
   }
 
