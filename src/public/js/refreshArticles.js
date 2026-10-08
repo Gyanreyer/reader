@@ -372,7 +372,7 @@ async function processAtomFeedResponse(feedURL, feedDocument, isFirstFetch) {
 // The proxy sets this header when the feed URL permanently redirects to a new URL
 const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
 
-// The proxy sets this header to the publisher's Cache-Control when serving a response from its own cache
+// The proxy sets this header to the publisher's Cache-Control
 const ORIGINAL_CACHE_CONTROL_HEADER = "X-Proxy-Original-Cache-Control";
 
 // Publishers' refresh hints can lengthen a feed's refresh interval up to this limit
@@ -443,10 +443,8 @@ function getFeedDocumentRefreshHint(feedDocument) {
 function getResponseRefreshHint(response) {
   const { headers } = response;
 
-  // The proxy keeps the publisher's Cache-Control here when it serves a response from its own cache
-  const cacheControl = headers.has(ORIGINAL_CACHE_CONTROL_HEADER)
-    ? headers.get(ORIGINAL_CACHE_CONTROL_HEADER)
-    : headers.get("Cache-Control");
+  // The proxy passes on the publisher's Cache-Control here, since its own Cache-Control is always no-store
+  const cacheControl = headers.get(ORIGINAL_CACHE_CONTROL_HEADER);
 
   const maxAgeMatch = cacheControl?.match(/(?:^|,)\s*max-age\s*=\s*"?(\d+)/i);
   if (maxAgeMatch) {

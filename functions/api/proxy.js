@@ -92,15 +92,10 @@ const getArticleHeadResponse = async (response) => {
     await response.body.cancel().catch(() => {});
   }
 
-  const headers = new Headers(response.headers);
-  // The body has changed, so the original length and encoding no longer apply
-  headers.delete("Content-Length");
-  headers.delete("Content-Encoding");
-
   return new Response(head, {
     status: response.status,
     statusText: response.statusText,
-    headers,
+    headers: response.headers,
   });
 };
 
@@ -115,8 +110,19 @@ const MAX_REDIRECTS = 10;
 // Tells the client the URL that a proxied URL has permanently moved to
 const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
 
-// Cached responses have their Cache-Control replaced with the proxy cache's own, so the publisher's is kept here
+// Our responses always have Cache-Control: no-store, so the publisher's Cache-Control is passed on here
 const ORIGINAL_CACHE_CONTROL_HEADER = "X-Proxy-Original-Cache-Control";
+
+// The only publisher response headers the client uses
+const FORWARDED_RESPONSE_HEADERS = [
+  "Content-Type",
+  "ETag",
+  "Last-Modified",
+  "Expires",
+  "Date",
+  "Retry-After",
+  "cf-mitigated",
+];
 
 /**
  * Fetches a request, following redirects ourselves so we can tell when a URL has permanently moved.
@@ -176,6 +182,20 @@ const getProxiedResponse = async (proxyRequest, responseHeaders) => {
       responseHeaders.set(PERMANENT_REDIRECT_HEADER, permanentRedirectURL);
     }
 
+    // Publishers' responses are served from our own origin, so only pass on the headers the client needs.
+    // Headers like Set-Cookie, Clear-Site-Data, or No-Vary-Search would otherwise apply to the reader itself.
+    for (const headerName of FORWARDED_RESPONSE_HEADERS) {
+      const value = proxiedResponse.headers.get(headerName);
+      if (value !== null) {
+        responseHeaders.set(headerName, value);
+      }
+    }
+    // The publisher's Cache-Control is only a refresh hint for the client; we never let the browser cache our responses
+    responseHeaders.set(
+      ORIGINAL_CACHE_CONTROL_HEADER,
+      proxiedResponse.headers.get("Cache-Control") ?? ""
+    );
+
     if (proxiedResponse.ok) {
       const requestEtag = proxyRequest.headers.get("If-None-Match");
 
@@ -210,11 +230,6 @@ const getProxiedResponse = async (proxyRequest, responseHeaders) => {
       }
     }
 
-    proxiedResponse.headers.forEach((value, key) => {
-      // Apply the proxied response headers to the responseHeaders object
-      responseHeaders.append(key, value);
-    });
-
     return new Response(proxiedResponse.body, {
       status: proxiedResponse.status,
       statusText: proxiedResponse.statusText,
@@ -236,6 +251,9 @@ export const onRequest = async (context) => {
     "Access-Control-Allow-Origin": `https://${context.env.ALLOWED_ORIGIN}`,
     Vary: "Origin",
     "Access-Control-Allow-Methods": "GET",
+    // The client decides when to fetch again, and our own cache limits how often publishers are hit,
+    // so the browser's HTTP cache would only serve stale responses
+    "Cache-Control": "no-store",
   });
 
   /**
@@ -283,7 +301,23 @@ export const onRequest = async (context) => {
   const cache = await caches.open("proxy-cache");
   let cachedResponse = await cache.match(proxyURL);
   if (cachedResponse) {
-    return cachedResponse;
+    // Rebuild the headers rather than returning the cached ones as-is; the cached copy's Cache-Control
+    // is only for our own cache, and older cached copies may include publisher headers we no longer pass on
+    for (const headerName of [
+      ...FORWARDED_RESPONSE_HEADERS,
+      PERMANENT_REDIRECT_HEADER,
+      ORIGINAL_CACHE_CONTROL_HEADER,
+    ]) {
+      const value = cachedResponse.headers.get(headerName);
+      if (value !== null) {
+        responseHeaders.set(headerName, value);
+      }
+    }
+    return new Response(cachedResponse.body, {
+      status: cachedResponse.status,
+      statusText: cachedResponse.statusText,
+      headers: responseHeaders,
+    });
   }
 
   // Anything that isn't a feed is an article page
@@ -324,11 +358,6 @@ export const onRequest = async (context) => {
     // Write the proxied response to the cache; it will expire in 1 hour.
     // For article pages, this is only the page's <head>.
     cachedResponse = proxiedResponse.clone();
-    // Keep the publisher's Cache-Control so the client can still use it as a refresh hint
-    cachedResponse.headers.set(
-      ORIGINAL_CACHE_CONTROL_HEADER,
-      proxiedResponse.headers.get("Cache-Control") ?? ""
-    );
     cachedResponse.headers.set("Cache-Control", "max-age=3600");
     await cache.put(proxyURL, cachedResponse);
   }
