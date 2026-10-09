@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { getFilterFeedURL } from "../utils/getFilterFeedURL.js";
 import { css, html, LitElement } from "/lib/lit.js";
 
 export default class HeaderTitle extends LitElement {
@@ -17,9 +18,7 @@ export default class HeaderTitle extends LitElement {
   constructor() {
     super();
 
-    const filterFeedURL = new URLSearchParams(window.location.search).get(
-      "filter-feed-url"
-    );
+    const filterFeedURL = getFilterFeedURL();
 
     this._title = "All Articles";
 

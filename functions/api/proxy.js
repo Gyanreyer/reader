@@ -4,6 +4,10 @@
 
 // Generated from feeds.yml by scripts/build-feeds.js, which runs before the Function is bundled
 import feedURLs from "../../_site/feeds.json";
+import {
+  ORIGINAL_CACHE_CONTROL_HEADER,
+  PERMANENT_REDIRECT_HEADER,
+} from "../../src/public/js/utils/proxiedFetch.js";
 
 /**
  * Normalizes a hostname so that "www.example.com" and "example.com" are treated as the same host.
@@ -107,12 +111,6 @@ const ARTICLE_PAGE_ACCEPT_HEADER =
 
 const MAX_REDIRECTS = 10;
 
-// Tells the client the URL that a proxied URL has permanently moved to
-const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
-
-// Our responses always have Cache-Control: no-store, so the publisher's Cache-Control is passed on here
-const ORIGINAL_CACHE_CONTROL_HEADER = "X-Proxy-Original-Cache-Control";
-
 // The only publisher response headers the client uses
 const FORWARDED_RESPONSE_HEADERS = [
   "Content-Type",
@@ -125,12 +123,30 @@ const FORWARDED_RESPONSE_HEADERS = [
 ];
 
 /**
+ * Copies the named headers that are present from one set of headers to another.
+ *
+ * @param {Headers} from
+ * @param {Headers} to
+ * @param {string[]} headerNames
+ */
+const copyHeaders = (from, to, headerNames) => {
+  for (const headerName of headerNames) {
+    const value = from.get(headerName);
+    if (value !== null) {
+      to.set(headerName, value);
+    }
+  }
+};
+
+/**
  * Fetches a request, following redirects ourselves so we can tell when a URL has permanently moved.
  *
  * @param {Request} proxyRequest
+ * @param {(redirectURL: string) => boolean} isAllowedRedirectURL Redirects to any other URL get a 403 response
+ *  instead of being followed
  * @returns {Promise<{ response: Response; permanentRedirectURL: string | null; }>}
  */
-const fetchFollowingRedirects = async (proxyRequest) => {
+const fetchFollowingRedirects = async (proxyRequest, isAllowedRedirectURL) => {
   let currentRequest = proxyRequest;
   /**
    * @type {string | null}
@@ -156,6 +172,15 @@ const fetchFollowingRedirects = async (proxyRequest) => {
 
     const redirectURL = new URL(location, currentRequest.url).toString();
 
+    if (!isAllowedRedirectURL(redirectURL)) {
+      return {
+        response: new Response(`Redirect to ${redirectURL} is not allowed`, {
+          status: 403,
+        }),
+        permanentRedirectURL,
+      };
+    }
+
     // The original URL has only permanently moved if every redirect up to this one was also permanent
     isPermanentSoFar &&= response.status === 301 || response.status === 308;
     if (isPermanentSoFar) {
@@ -171,12 +196,23 @@ const fetchFollowingRedirects = async (proxyRequest) => {
 /**
  * @param {Request} proxyRequest
  * @param {Headers} responseHeaders
+ * @param {boolean} isFeedRequest
  * @returns {Promise<Response>}
  */
-const getProxiedResponse = async (proxyRequest, responseHeaders) => {
+const getProxiedResponse = async (
+  proxyRequest,
+  responseHeaders,
+  isFeedRequest
+) => {
   try {
     const { response: proxiedResponse, permanentRedirectURL } =
-      await fetchFollowingRedirects(proxyRequest);
+      await fetchFollowingRedirects(
+        proxyRequest,
+        // A feed's URL is fixed in feeds.yml, so its publisher can send it anywhere, including to a new host.
+        // An article page can be any URL on a feed's host, so it must not redirect off the allowlist,
+        // or an open redirect on that host would let anyone proxy any URL.
+        isFeedRequest ? () => true : isAllowedProxyURL
+      );
 
     if (permanentRedirectURL) {
       responseHeaders.set(PERMANENT_REDIRECT_HEADER, permanentRedirectURL);
@@ -184,12 +220,11 @@ const getProxiedResponse = async (proxyRequest, responseHeaders) => {
 
     // Publishers' responses are served from our own origin, so only pass on the headers the client needs.
     // Headers like Set-Cookie, Clear-Site-Data, or No-Vary-Search would otherwise apply to the reader itself.
-    for (const headerName of FORWARDED_RESPONSE_HEADERS) {
-      const value = proxiedResponse.headers.get(headerName);
-      if (value !== null) {
-        responseHeaders.set(headerName, value);
-      }
-    }
+    copyHeaders(
+      proxiedResponse.headers,
+      responseHeaders,
+      FORWARDED_RESPONSE_HEADERS
+    );
     // The publisher's Cache-Control is only a refresh hint for the client; we never let the browser cache our responses
     responseHeaders.set(
       ORIGINAL_CACHE_CONTROL_HEADER,
@@ -303,16 +338,11 @@ export const onRequest = async (context) => {
   if (cachedResponse) {
     // Rebuild the headers rather than returning the cached ones as-is; the cached copy's Cache-Control
     // is only for our own cache, and older cached copies may include publisher headers we no longer pass on
-    for (const headerName of [
+    copyHeaders(cachedResponse.headers, responseHeaders, [
       ...FORWARDED_RESPONSE_HEADERS,
       PERMANENT_REDIRECT_HEADER,
       ORIGINAL_CACHE_CONTROL_HEADER,
-    ]) {
-      const value = cachedResponse.headers.get(headerName);
-      if (value !== null) {
-        responseHeaders.set(headerName, value);
-      }
-    }
+    ]);
     return new Response(cachedResponse.body, {
       status: cachedResponse.status,
       statusText: cachedResponse.statusText,
@@ -346,7 +376,8 @@ export const onRequest = async (context) => {
 
   let proxiedResponse = await getProxiedResponse(
     proxyRequest,
-    responseHeaders
+    responseHeaders,
+    isFeedRequest
   );
 
   if (!isFeedRequest) {

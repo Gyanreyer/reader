@@ -3,7 +3,11 @@ import { refreshFeeds } from "./refreshFeeds.js";
 import { settings } from "./settings.js";
 import { enqueueForHost, getHostKey } from "./utils/hostQueue.js";
 import { parseRetryAfter } from "./utils/parseRetryAfter.js";
-import { proxiedFetch } from "./utils/proxiedFetch.js";
+import {
+  ORIGINAL_CACHE_CONTROL_HEADER,
+  PERMANENT_REDIRECT_HEADER,
+  proxiedFetch,
+} from "./utils/proxiedFetch.js";
 
 /**
  * @import { Article, Feed } from './db.js';
@@ -32,9 +36,14 @@ async function updateSavedArticles(parsedArticles) {
         articleURLsToAdd.delete(article.url);
         const latestArticleData = parsedArticles[article.url];
         if (latestArticleData) {
-          article.title = latestArticleData.title;
-          article.publishedAt = latestArticleData.publishedAt;
-          article.author = latestArticleData.author;
+          // An article can be in more than one feed, like a post that's also in an aggregator's feed. It stays with
+          // the feed that found it first, so only that feed's details are kept; otherwise each Refresh would swap
+          // in the details from whichever feed was fetched last.
+          if (article.feedURL === latestArticleData.feedURL) {
+            article.title = latestArticleData.title;
+            article.publishedAt = latestArticleData.publishedAt;
+            article.author = latestArticleData.author;
+          }
           if (
             latestArticleData.thumbnail &&
             (article.thumbnail === null ||
@@ -106,16 +115,16 @@ const getContentImage = (contentDocument, articleURL) => {
  * as new.
  *
  * @param {number} publishedAt
- * @param {number | null} previousRefreshAt When we last successfully fetched the feed, or null if we never have
+ * @param {number | null} previousFetchAt When we last successfully fetched the feed, or null if we never have
  * @returns {number}
  */
-const getDiscoveredAt = (publishedAt, previousRefreshAt) => {
+const getDiscoveredAt = (publishedAt, previousFetchAt) => {
   const now = Date.now();
   if (!(publishedAt > 0)) {
     // The publish date is missing or invalid
     return now;
   }
-  return Math.min(Math.max(publishedAt, previousRefreshAt ?? 0), now);
+  return Math.min(Math.max(publishedAt, previousFetchAt ?? 0), now);
 };
 
 const ATOM_NAMESPACE = "http://www.w3.org/2005/Atom";
@@ -219,7 +228,7 @@ const formatAuthorNames = (rawNames) => {
  *  rawPublishedAtTimestamp?: string | null;
  *  rawAuthorNames?: Array<string | null | undefined>;
  *  rawFeedAuthorNames?: Array<string | null | undefined>; // Used if the article has no authors of its own
- *  previousRefreshAt?: number | null; // When we last successfully fetched the feed, or null if we never have
+ *  previousFetchAt?: number | null; // When we last successfully fetched the feed, or null if we never have
  * }} data
  *
  * @returns {Article}
@@ -233,7 +242,7 @@ const getFormattedArticleData = ({
   rawPublishedAtTimestamp = null,
   rawAuthorNames = [],
   rawFeedAuthorNames = [],
-  previousRefreshAt = null,
+  previousFetchAt = null,
 }) => {
   let url = rawURL?.trim();
 
@@ -315,7 +324,7 @@ const getFormattedArticleData = ({
     title,
     wordCount,
     publishedAt,
-    discoveredAt: getDiscoveredAt(publishedAt, previousRefreshAt),
+    discoveredAt: getDiscoveredAt(publishedAt, previousFetchAt),
     author:
       formatAuthorNames(rawAuthorNames) ?? formatAuthorNames(rawFeedAuthorNames),
     thumbnail,
@@ -326,9 +335,9 @@ const getFormattedArticleData = ({
 /**
  * @param {string} feedURL
  * @param {Record<string, any>} feedJSON
- * @param {number | null} previousRefreshAt
+ * @param {number | null} previousFetchAt
  */
-async function processJSONFeedResponse(feedURL, feedJSON, previousRefreshAt) {
+async function processJSONFeedResponse(feedURL, feedJSON, previousFetchAt) {
   const feedTitle = feedJSON.title?.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -370,7 +379,7 @@ async function processJSONFeedResponse(feedURL, feedJSON, previousRefreshAt) {
           )?.url,
         rawAuthorNames: getJSONFeedAuthorNames(item),
         rawFeedAuthorNames: feedAuthorNames,
-        previousRefreshAt,
+        previousFetchAt,
       });
       parsedArticles[article.url] = article;
     } catch (e) {
@@ -390,9 +399,9 @@ async function processJSONFeedResponse(feedURL, feedJSON, previousRefreshAt) {
  *
  * @param {string} feedURL
  * @param {Document} feedDocument
- * @param {number | null} previousRefreshAt
+ * @param {number | null} previousFetchAt
  */
-async function processRSSFeedResponse(feedURL, feedDocument, previousRefreshAt) {
+async function processRSSFeedResponse(feedURL, feedDocument, previousFetchAt) {
   const feedTitle = feedDocument.querySelector("channel > title")?.textContent.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -431,7 +440,7 @@ async function processRSSFeedResponse(feedURL, feedDocument, previousRefreshAt) 
             (creator) => creator.textContent
           ),
         ],
-        previousRefreshAt,
+        previousFetchAt,
       });
 
       parsedArticles[article.url] = article;
@@ -450,9 +459,9 @@ async function processRSSFeedResponse(feedURL, feedDocument, previousRefreshAt) 
 /**
  * @param {string} feedURL
  * @param {Document} feedDocument
- * @param {number | null} previousRefreshAt
+ * @param {number | null} previousFetchAt
  */
-async function processAtomFeedResponse(feedURL, feedDocument, previousRefreshAt) {
+async function processAtomFeedResponse(feedURL, feedDocument, previousFetchAt) {
   const feedTitle = feedDocument.querySelector("feed > title")?.textContent.trim();
   if (feedTitle) {
     await db.feeds.update(feedURL, { title: feedTitle });
@@ -485,7 +494,7 @@ async function processAtomFeedResponse(feedURL, feedDocument, previousRefreshAt)
           ?.getAttribute("url"),
         rawAuthorNames: getAtomAuthorNames(entry),
         rawFeedAuthorNames: feedAuthorNames,
-        previousRefreshAt,
+        previousFetchAt,
       });
       parsedArticles[article.url] = article;
     } catch (e) {
@@ -499,12 +508,6 @@ async function processAtomFeedResponse(feedURL, feedDocument, previousRefreshAt)
 
   return updateSavedArticles(parsedArticles);
 }
-
-// The proxy sets this header when the feed URL permanently redirects to a new URL
-const PERMANENT_REDIRECT_HEADER = "X-Proxy-Permanent-Redirect";
-
-// The proxy sets this header to the publisher's Cache-Control
-const ORIGINAL_CACHE_CONTROL_HEADER = "X-Proxy-Original-Cache-Control";
 
 // Publishers' refresh hints can lengthen a feed's refresh interval up to this limit
 const MAX_REFRESH_HINT_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
@@ -601,14 +604,14 @@ function getResponseRefreshHint(response) {
  * @param {string} feedURL
  * @param {string} feedText
  * @param {string | null} contentType
- * @param {number | null} previousRefreshAt
+ * @param {number | null} previousFetchAt
  *
  * @returns {Promise<{
  *  newArticlesCount: number;
  *  refreshHint: number | null;
  * }>} The number of new articles that were added to the database, and how often the feed suggests it should be fetched
  */
-async function processFeedText(feedURL, feedText, contentType, previousRefreshAt) {
+async function processFeedText(feedURL, feedText, contentType, previousFetchAt) {
   /**
    * @type {Record<string, any> | null}
    */
@@ -638,7 +641,7 @@ async function processFeedText(feedURL, feedText, contentType, previousRefreshAt
       newArticlesCount: await processJSONFeedResponse(
         feedURL,
         feedJSON,
-        previousRefreshAt
+        previousFetchAt
       ),
       // JSON Feed has no way to suggest how often to fetch it
       refreshHint: null,
@@ -653,7 +656,7 @@ async function processFeedText(feedURL, feedText, contentType, previousRefreshAt
       newArticlesCount: await processAtomFeedResponse(
         feedURL,
         feedDocument,
-        previousRefreshAt
+        previousFetchAt
       ),
       refreshHint,
     };
@@ -662,7 +665,7 @@ async function processFeedText(feedURL, feedText, contentType, previousRefreshAt
       newArticlesCount: await processRSSFeedResponse(
         feedURL,
         feedDocument,
-        previousRefreshAt
+        previousFetchAt
       ),
       refreshHint,
     };
@@ -678,7 +681,7 @@ async function processFeedText(feedURL, feedText, contentType, previousRefreshAt
       newArticlesCount: await processAtomFeedResponse(
         feedURL,
         feedDocument,
-        previousRefreshAt
+        previousFetchAt
       ),
       refreshHint,
     };
@@ -687,7 +690,7 @@ async function processFeedText(feedURL, feedText, contentType, previousRefreshAt
       newArticlesCount: await processRSSFeedResponse(
         feedURL,
         feedDocument,
-        previousRefreshAt
+        previousFetchAt
       ),
       refreshHint,
     };
@@ -762,7 +765,7 @@ const formatDate = (timestamp) => {
  * or stop fetching it entirely if it's gone.
  *
  * @param {Feed} feed
- * @param {Response | null} response The error response, or null if the fetch failed without one
+ * @param {Response | null} response The error response, or null if the feed couldn't be read or processed
  * @param {number} refreshInterval
  * @returns {Partial<Feed>}
  */
@@ -833,7 +836,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     return 0;
   }
 
-  const previousRefreshAt = feed.lastSuccessfulRefreshAt ?? null;
+  const previousFetchAt = feed.lastSuccessfulRefreshAt ?? null;
   const fetchStartedAt = Date.now();
 
   const headers = new Headers();
@@ -844,12 +847,14 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
     headers.set("If-Modified-Since", feed.lastModified);
   }
 
-  try {
-    const feedResponse = await proxiedFetch(feed.url, {
-      method: "GET",
-      headers,
-    });
+  // This only throws if we can't reach our own proxy, which returns an error response when it can't reach the publisher.
+  // That's a problem with our own connection rather than the feed, so it doesn't count as a failure.
+  const feedResponse = await proxiedFetch(feed.url, {
+    method: "GET",
+    headers,
+  });
 
+  try {
     if (!feedResponse.ok && feedResponse.status !== 304) {
       feedResponse.body?.cancel();
       throw new FeedResponseError(feed.url, feedResponse);
@@ -882,7 +887,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
         feed.url,
         await feedResponse.text(),
         feedResponse.headers.get("content-type"),
-        previousRefreshAt
+        previousFetchAt
       );
       newArticlesCount = processedFeed.newArticlesCount;
       changes.isMultiAuthor = await getIsMultiAuthorFeed(feed.url);
@@ -911,7 +916,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
 
     return newArticlesCount;
   } catch (e) {
-    // Network errors and unparseable feeds count as failures too
+    // Feeds we couldn't read or process count as failures too
     await db.feeds.update(
       feed.url,
       getFeedFailureChanges(
@@ -924,7 +929,7 @@ export async function refreshArticlesForFeed(feed, shouldForceRefresh = false) {
   }
 }
 
-const MAX_CONCURRENT_FEED_REFRESHES = 6;
+const MAX_CONCURRENT_FEED_FETCHES = 6;
 
 /**
  * Refreshes every feed.
@@ -950,14 +955,14 @@ export async function refreshAllArticles({
 
     let refreshedFeedCount = 0;
 
-    // Each host's feeds are refreshed one at a time, so we never fetch more than one feed from a host at once
+    // Each host's feeds are fetched one at a time, so we never fetch more than one feed from a host at once
     const hostFeedQueues = Array.from(
       Map.groupBy(feeds, (feed) =>
         URL.canParse(feed.url) ? getHostKey(feed.url) : feed.url
       ).values()
     );
 
-    const refreshNextHostFeeds = async () => {
+    const fetchNextHostFeeds = async () => {
       /**
        * @type {Feed[] | undefined}
        */
@@ -981,9 +986,9 @@ export async function refreshAllArticles({
     await Promise.all(
       Array.from(
         {
-          length: Math.min(MAX_CONCURRENT_FEED_REFRESHES, hostFeedQueues.length),
+          length: Math.min(MAX_CONCURRENT_FEED_FETCHES, hostFeedQueues.length),
         },
-        refreshNextHostFeeds
+        fetchNextHostFeeds
       )
     );
   } catch (e) {

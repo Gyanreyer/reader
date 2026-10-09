@@ -2,6 +2,7 @@ import { db } from "./db.js";
 
 /**
  * @import { Article } from './db.js';
+ * @import { FiltersContextValue } from './context/filtersContext.js';
  */
 
 /**
@@ -25,9 +26,7 @@ const MIN_BATCH_SIZE = 20;
  */
 
 /**
- * @typedef {{
- *  includeRead: boolean;
- *  includeUnread: boolean;
+ * @typedef {FiltersContextValue & {
  *  filterFeedURL: string | null;
  * }} ArticleFilters
  */

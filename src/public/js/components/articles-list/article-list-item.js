@@ -432,7 +432,7 @@ export default class ArticleListItem extends LitElement {
         <p id="published-at">
           <span class="sr-only">Published</span>
           <time datetime="${parsedPublishedAt.toISOString()}"
-            ><relative-date
+            ><relative-date datetime="${parsedPublishedAt.toISOString()}"
               >${parsedPublishedAt.toLocaleString()}</relative-date
             ></time
           >

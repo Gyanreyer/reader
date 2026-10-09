@@ -159,14 +159,14 @@ db.version(6)
         );
       });
 
-    // Feeds with stored articles have fetched successfully; lastRefreshedAt is our best guess at when they last did
+    // A feed's latest batch is the last fetch we know succeeded. lastRefreshedAt can't be trusted for this,
+    // since it used to be set after failed fetches too.
     await tx
       .table("feeds")
       .toCollection()
       .modify((feed) => {
-        feed.lastSuccessfulRefreshAt = feedBatches.has(feed.url)
-          ? feed.lastRefreshedAt ?? null
-          : null;
+        const batches = feedBatches.get(feed.url);
+        feed.lastSuccessfulRefreshAt = batches ? Math.max(...batches) : null;
       });
   });
 

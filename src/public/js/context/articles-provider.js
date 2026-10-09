@@ -6,6 +6,7 @@ import {
   css,
 } from "/lib/lit.js";
 import { articlesContext } from "/js/context/articlesContext.js";
+import { getFilterFeedURL } from "/js/utils/getFilterFeedURL.js";
 import { filtersContext } from "./filtersContext.js";
 import { getArticleBatch } from "../articleBatches.js";
 import { refreshAllArticles } from "../refreshArticles.js";
@@ -155,9 +156,7 @@ export default class ArticlesProvider extends LitElement {
     this._filters = {
       includeRead,
       includeUnread,
-      filterFeedURL: new URLSearchParams(window.location.search).get(
-        "filter-feed-url"
-      ),
+      filterFeedURL: getFilterFeedURL(),
     };
     this._cursor = Infinity;
     const listGeneration = ++this._listGeneration;

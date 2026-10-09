@@ -47,6 +47,41 @@ async function recordHostFailure(url, retryAfter, reason) {
 }
 
 /**
+ * Checks whether a response means the whole host is refusing or failing requests, rather than just this page.
+ *
+ * @param {Response} response
+ * @param {string} responseDescription
+ * @returns {{ retryAfter: number; reason: string } | null}
+ */
+function getHostRefusal(response, responseDescription) {
+  if (response.headers.get("cf-mitigated") === "challenge") {
+    return {
+      retryAfter: Date.now() + ONE_WEEK,
+      reason: `Received a challenge page (${responseDescription})`,
+    };
+  }
+
+  if (response.status === 429 || response.status === 503) {
+    return {
+      retryAfter:
+        parseRetryAfter(response.headers.get("Retry-After")) ??
+        Date.now() + ONE_DAY,
+      reason: responseDescription,
+    };
+  }
+
+  if (response.status === 403) {
+    return { retryAfter: Date.now() + ONE_WEEK, reason: responseDescription };
+  }
+
+  if (response.status >= 500) {
+    return { retryAfter: Date.now() + ONE_DAY, reason: responseDescription };
+  }
+
+  return null;
+}
+
+/**
  * @param {string} url
  * @returns {Promise<URLMetadata | null | typeof HOST_UNAVAILABLE>}
  */
@@ -69,36 +104,10 @@ async function fetchMetadataForURL(url) {
 
   const responseDescription = `${response.status} ${response.statusText}`.trim();
 
-  if (response.headers.get("cf-mitigated") === "challenge") {
+  const refusal = getHostRefusal(response, responseDescription);
+  if (refusal) {
     response.body?.cancel();
-    await recordHostFailure(
-      url,
-      Date.now() + ONE_WEEK,
-      `Received a challenge page (${responseDescription})`
-    );
-    return HOST_UNAVAILABLE;
-  }
-
-  if (response.status === 429 || response.status === 503) {
-    response.body?.cancel();
-    await recordHostFailure(
-      url,
-      parseRetryAfter(response.headers.get("Retry-After")) ??
-        Date.now() + ONE_DAY,
-      responseDescription
-    );
-    return HOST_UNAVAILABLE;
-  }
-
-  if (response.status === 403) {
-    response.body?.cancel();
-    await recordHostFailure(url, Date.now() + ONE_WEEK, responseDescription);
-    return HOST_UNAVAILABLE;
-  }
-
-  if (response.status >= 500) {
-    response.body?.cancel();
-    await recordHostFailure(url, Date.now() + ONE_DAY, responseDescription);
+    await recordHostFailure(url, refusal.retryAfter, refusal.reason);
     return HOST_UNAVAILABLE;
   }
 

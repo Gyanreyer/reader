@@ -1,5 +1,6 @@
 import { css, html, LitElement } from "/lib/lit.js";
 import { db } from "/js/db.js";
+import { getFilterFeedURL } from "/js/utils/getFilterFeedURL.js";
 
 /**
  * @import { Feed } from '/js/db.js';
@@ -41,9 +42,7 @@ export default class FeedStatus extends LitElement {
     this._feed = null;
 
     this._onFeedsUpdated = async () => {
-      const filterFeedURL = new URLSearchParams(window.location.search).get(
-        "filter-feed-url"
-      );
+      const filterFeedURL = getFilterFeedURL();
       this._feed = filterFeedURL
         ? (await db.feeds.get(filterFeedURL)) ?? null
         : null;
